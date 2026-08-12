@@ -1,4 +1,4 @@
-# AI掘金头条新闻系统 (Toutiao News)
+# AI头条新闻系统 (Toutiao News)
 
 一个基于 FastAPI 和 SQLAlchemy 构建的现代化新闻系统，支持用户注册登录、新闻浏览、收藏和历史记录等功能。
 
