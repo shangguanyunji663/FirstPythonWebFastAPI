@@ -126,7 +126,11 @@ npm run dev
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | 后端 API 基础地址 | http://127.0.0.1:8000 |
-| `VITE_AI_API_KEY` | AI 问答功能的模型服务 API Key（不入库） | 空 |
+| `VITE_AI_PROVIDER` | AI 提供方：`zhipu`（智谱云端）/ `ollama`（本地） | zhipu |
+| `VITE_AI_API_KEY` | 智谱 API Key（不入库） | 空 |
+| `VITE_AI_MODEL` | 智谱模型 | glm-4.7-flash |
+| `VITE_OLLAMA_BASE_URL` | 本地 Ollama 服务地址 | http://localhost:11434 |
+| `VITE_OLLAMA_MODEL` | 本地 Ollama 模型（需先 ollama pull） | qwen3:4b |
 
 ## 1-5 功能模块
 

@@ -65,6 +65,7 @@ const isLoading = ref(false);
 const apiEndpoint = ref(aiChatConfig.apiEndpoint);
 const apiKey = ref(aiChatConfig.apiKey);
 const model = ref(aiChatConfig.model);
+const provider = ref(aiChatConfig.provider);
 
 // 格式化消息内容（支持Markdown）
 const formatMessage = (content) => {
@@ -121,13 +122,14 @@ const fetchAIResponse = async (userMessage) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.value}`,
-        'X-DashScope-SSE': 'enable' // 添加阿里云DashScope所需的SSE头
+        'Authorization': `Bearer ${apiKey.value}`
       },
       body: JSON.stringify({
         model: model.value,
         messages: allMessages,
-        stream: true
+        stream: true,
+        // 关闭深度思考，回复直接流式输出（仅智谱 GLM 系列识别该参数）
+        ...(provider.value === 'zhipu' ? { thinking: { type: 'disabled' } } : {})
       })
     });
     
@@ -157,10 +159,8 @@ const fetchAIResponse = async (userMessage) => {
         
         try {
           const json = JSON.parse(data);
-          // 适配阿里云DashScope的返回格式
-          const content = json.choices?.[0]?.delta?.content || 
-                         json.output?.text || 
-                         json.choices?.[0]?.message?.content || '';
+          // 标准 OpenAI 兼容流式格式（智谱 v4 接口兼容）
+          const content = json.choices?.[0]?.delta?.content || '';
           if (content) {
             aiResponse += content;
             // 更新最后一条消息
