@@ -32,8 +32,7 @@ FoundGoldenNews/                        # 仓库根目录
 │   ├── crud/                           # 数据访问层（CRUD操作）
 │   │   ├── favorite.py                 # 收藏相关数据库操作
 │   │   ├── history.py                  # 历史记录相关数据库操作
-│   │   ├── news.py                     # 新闻相关数据库操作
-│   │   ├── news_cache.py               # 新闻相关数据库操作（带缓存）
+│   │   ├── news_cache.py               # 新闻相关数据库操作（含缓存读写与失效）
 │   │   └── users.py                    # 用户相关数据库操作
 │   ├── models/                         # 数据模型定义（SQLAlchemy）
 │   ├── routers/                        # API路由定义
@@ -54,6 +53,7 @@ FoundGoldenNews/                        # 仓库根目录
 │       ├── views/                      # 页面组件
 │       ├── components/                 # 公共组件
 │       ├── store/                      # Pinia 状态管理
+│       ├── api/request.js              # axios 统一封装（baseURL/Bearer Token/401 拦截）
 │       ├── router/                     # 路由
 │       ├── i18n/                       # 国际化（zh-CN / en-US）
 │       └── config/api.js               # API 地址配置
@@ -64,11 +64,14 @@ FoundGoldenNews/                        # 仓库根目录
 ├── database/
 │   └── database.sql                    # 建库建表 SQL（含 8 张表）
 │
+├── backend-learning.md                 # 后端零基础学习与复现指南
 ├── .gitignore
 └── README.md
 ```
 
 ## 1-4 快速开始
+
+> 只会 Python 基础、想从头理解并独立复现后端？直接看根目录的 [backend-learning.md](backend-learning.md)，按章节顺序边学边写。
 
 ### 环境准备
 
@@ -114,8 +117,16 @@ npm run dev
 | `DB_USER` / `DB_PASSWORD` / `DB_HOST` / `DB_PORT` / `DB_NAME` | MySQL 连接信息 | root / 空 / localhost / 3306 / news_app |
 | `SQL_ECHO` | 是否在控制台输出 SQL 日志 | false |
 | `DEBUG_MODE` | true 时异常详情（含堆栈）返回给客户端，仅限本地开发 | false |
+| `LOG_LEVEL` | 日志级别（DEBUG/INFO/WARNING/ERROR） | INFO |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_DB` / `REDIS_PASSWORD` | Redis 连接信息 | localhost / 6379 / 0 / 空 |
 | `CORS_ORIGINS` | 生产环境前端来源白名单（逗号分隔） | 空 |
+
+### 前端环境变量（frontend/.env.local，模板见 frontend/.env.example）
+
+| 变量 | 说明 | 默认 |
+| --- | --- | --- |
+| `VITE_API_BASE_URL` | 后端 API 基础地址 | http://127.0.0.1:8000 |
+| `VITE_AI_API_KEY` | AI 问答功能的模型服务 API Key（不入库） | 空 |
 
 ## 1-5 功能模块
 
@@ -189,10 +200,21 @@ npm run dev
     - 缓存键: `news:categories`
     - 过期时间: 2小时
 
+4. **分类新闻总数缓存**
+    - 缓存键: `news:count:{category_id}`
+    - 过期时间: 30分钟
+    - 列表接口分页总数不再每次执行 `count(*)`
+
+5. **相关新闻缓存**
+    - 缓存键: `news:related:{news_id}:{category_id}`
+    - 过期时间: 30分钟
+
 ### 缓存更新机制
 
-- 数据更新时自动清除相关缓存
+- 新闻浏览量写库成功后，自动失效该新闻的详情与相关新闻缓存（写后失效策略）
 - 采用缓存失效而非主动更新策略
+- 空结果（不存在的新闻/分类）写入 60 秒短 TTL 占位，防止缓存穿透
+- 各类缓存 TTL 附加 ±10% 随机抖动，避免同类键集中过期引发缓存雪崩
 - Redis 不可用时自动降级为直连数据库
 
 ### 缓存配置
@@ -245,7 +267,7 @@ Redis 连接信息通过 `backend/.env` 环境变量配置（模板见 `.env.exa
 系统使用基于令牌(Token)的认证机制：
 
 1. 用户登录成功后返回访问令牌
-2. 需要认证的接口在请求头中添加 `Authorization: Bearer <token值>`
+2. 需要认证的接口在请求头中添加 `Authorization: Bearer <token值>`（后端兼容直接传 token 值）
 3. 令牌有效期为7天
 
 ## 1-10 错误处理
@@ -272,3 +294,4 @@ Redis 连接信息通过 `backend/.env` 环境变量配置（模板见 `.env.exa
 - 异步数据库操作提升并发性能
 - 合理的数据库索引设计
 - 连接池管理减少连接开销
+- 空结果短 TTL 占位防缓存穿透，TTL 随机抖动防缓存雪崩
