@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.conda-env/
+.conda/
+
+# 环境变量（密钥与连接串不入库）
+.env
+# 前端本地环境变量（Vite 约定）
+frontend/.env.local
+frontend/.env.*.local
+
+# 前端
+node_modules/
+dist/
+
+# 工具状态目录
+.mimosa/
+.zcode/
+
+# IDE
+.idea/
+.vscode/
+
+# 系统文件
+.DS_Store
+Thumbs.db

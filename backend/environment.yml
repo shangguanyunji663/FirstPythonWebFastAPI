@@ -1,0 +1,12 @@
+# 后端 Python 环境定义（conda 管理）
+# 创建/重建环境：conda env create -f environment.yml -p .conda-env
+# 激活环境：conda activate ./.conda-env
+# 环境内运行：conda run -p .conda-env uvicorn main:app --reload
+name: foundgoldennews
+channels:
+  - defaults
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - -r requirements.txt   # 依赖版本统一维护在 requirements.txt
