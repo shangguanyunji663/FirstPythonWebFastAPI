@@ -2,8 +2,13 @@ from fastapi import HTTPException
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from utils.exception import http_exception_handler, integrity_error_handler, sqlalchemy_error_handler, \
-    general_exception_handler, request_validation_error_handler
+from utils.exception import (
+    general_exception_handler,
+    http_exception_handler,
+    integrity_error_handler,
+    request_validation_error_handler,
+    sqlalchemy_error_handler,
+)
 
 
 def register_exception_handlers(app):

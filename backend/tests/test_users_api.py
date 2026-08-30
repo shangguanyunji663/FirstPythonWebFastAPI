@@ -4,10 +4,9 @@ import hashlib
 from sqlalchemy import select
 
 from models.users import User, UserToken
+from tests.conftest import LOGIN_PATH, auth_headers, register_user
 from utils import security
 from utils.rate_limit import _attempts
-
-from tests.conftest import LOGIN_PATH, REGISTER_PATH, auth_headers, register_user
 
 USER_INFO_PATH = "/api/user/info"
 USER_UPDATE_PATH = "/api/user/update"
@@ -87,7 +86,9 @@ async def test_token_stored_as_sha256_digest(client, session_factory):
 async def test_login_invalidates_previous_token(client):
     """同一用户重新登录后，旧令牌应失效（每用户仅一条有效令牌）"""
     first = (await register_user(client)).json()["data"]["token"]
-    second = (await client.post(LOGIN_PATH, json={"username": "testuser01", "password": "pass123456"})).json()["data"]["token"]
+    second = (await client.post(
+        LOGIN_PATH, json={"username": "testuser01", "password": "pass123456"}
+    )).json()["data"]["token"]
 
     old_headers = {"Authorization": f"Bearer {first}"}
     new_headers = {"Authorization": f"Bearer {second}"}

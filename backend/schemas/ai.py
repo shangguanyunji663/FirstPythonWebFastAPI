@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,7 +12,7 @@ class AIChatMessage(BaseModel):
 class AIChatRequest(BaseModel):
     """AI 问答请求体"""
     message: str = Field(..., min_length=1, max_length=4000, description="用户消息")
-    history: List[AIChatMessage] = Field(default_factory=list, description="历史对话，最近若干条")
+    history: list[AIChatMessage] = Field(default_factory=list, description="历史对话，最近若干条")
 
 
 class AIChatRecordResponse(BaseModel):
@@ -28,5 +27,5 @@ class AIChatRecordResponse(BaseModel):
 
 class AIChatHistoryResponse(BaseModel):
     """聊天历史响应"""
-    list: List[AIChatRecordResponse]
+    list: list[AIChatRecordResponse]
     total: int

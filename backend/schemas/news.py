@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
 
-from pydantic import Field, ConfigDict, BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from schemas.base import NewsItemBase
 
@@ -19,7 +18,7 @@ class CategoryResponse(BaseModel):
 
 class NewsListResponse(BaseModel):
     """新闻列表响应"""
-    list: List[NewsItemBase]
+    list: list[NewsItemBase]
     total: int
     has_more: bool = Field(alias="hasMore")
 
@@ -32,7 +31,7 @@ class RelatedNewsResponse(BaseModel):
     """
     id: int
     title: str
-    image: Optional[str] = None
+    image: str | None = None
     views: int
 
     model_config = ConfigDict(

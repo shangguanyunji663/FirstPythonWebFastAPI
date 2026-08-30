@@ -111,7 +111,7 @@ const onSubmit = async () => {
         message: result.message
       });
     }
-  } catch (error) {
+  } catch {
     showToast({
       type: 'fail',
       message: t('register.failed')

@@ -3,8 +3,8 @@ import logging
 import os
 from typing import Any
 
-from dotenv import load_dotenv
 import redis.asyncio as redis
+from dotenv import load_dotenv
 
 logger = logging.getLogger("app.cache")
 

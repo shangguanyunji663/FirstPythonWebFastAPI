@@ -58,7 +58,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useNewsStore } from '../store/modules/news'
 import { useHistoryStore } from '../store/modules/history'
@@ -143,7 +143,7 @@ onMounted(async () => {
     // 先调用API记录浏览历史
     if (userStore.getLoginStatus) {
       try {
-        const result = await historyStore.addHistoryApi(newsStore.newsDetail.id);
+        await historyStore.addHistoryApi(newsStore.newsDetail.id);
       } catch (error) {
         console.error('记录浏览历史API失败:', error);
       }

@@ -1,7 +1,7 @@
 # 新闻相关的缓存方法：缓存键规则、读写与失效
 # key - value
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from config.cache_conf import (
     delete_cache,
@@ -43,7 +43,7 @@ async def get_cached_categories():
     return data
 
 
-async def set_cache_categories(data: List[Dict[str, Any]], expire: int = 7200):
+async def set_cache_categories(data: list[dict[str, Any]], expire: int = 7200):
     # 数据越稳定缓存越久：分类 7200；列表 1800；详情 300
     if not data:
         data = [EMPTY_MARKER]
@@ -52,20 +52,20 @@ async def set_cache_categories(data: List[Dict[str, Any]], expire: int = 7200):
 
 
 # ---------- 新闻列表 key = news_list:分类id:页码:每页数量 ----------
-def _list_key(category_id: Optional[int], page: int, size: int) -> str:
+def _list_key(category_id: int | None, page: int, size: int) -> str:
     category_part = category_id if category_id is not None else "all"
     return f"{NEWS_LIST_PREFIX}{category_part}:{page}:{size}"
 
 
-async def get_cache_news_list(category_id: Optional[int], page: int, size: int):
+async def get_cache_news_list(category_id: int | None, page: int, size: int):
     data = await get_json_cache(_list_key(category_id, page, size))
     if _detect_empty(data):
         return EMPTY
     return data
 
 
-async def set_cache_news_list(category_id: Optional[int], page: int, size: int,
-                              news_list: List[Dict[str, Any]], expire: int = 1800):
+async def set_cache_news_list(category_id: int | None, page: int, size: int,
+                              news_list: list[dict[str, Any]], expire: int = 1800):
     if not news_list:
         news_list = [EMPTY_MARKER]
         expire = EMPTY_TTL
@@ -73,14 +73,14 @@ async def set_cache_news_list(category_id: Optional[int], page: int, size: int,
 
 
 # ---------- 新闻详情 ----------
-async def get_cached_news_detail(news_id: int) -> Optional[Dict[str, Any]]:
+async def get_cached_news_detail(news_id: int) -> dict[str, Any] | None:
     data = await get_json_cache(f"{NEWS_DETAIL_PREFIX}{news_id}")
     if _detect_empty(data):
         return EMPTY
     return data
 
 
-async def cache_news_detail(news_id: int, news_data: Dict[str, Any], expire: int = 300) -> bool:
+async def cache_news_detail(news_id: int, news_data: dict[str, Any], expire: int = 300) -> bool:
     if not news_data:
         news_data = EMPTY_MARKER
         expire = EMPTY_TTL
@@ -89,17 +89,17 @@ async def cache_news_detail(news_id: int, news_data: Dict[str, Any], expire: int
 
 # ---------- 相关新闻 ----------
 async def cache_related_news(news_id: int, category_id: int,
-                             related_list: List[Dict[str, Any]], expire: int = 1800) -> bool:
+                             related_list: list[dict[str, Any]], expire: int = 1800) -> bool:
     return await set_cache(f"{RELATED_NEWS_PREFIX}{news_id}:{category_id}",
                            related_list, _with_jitter(expire))
 
 
-async def get_cached_related_news(news_id: int, category_id: int) -> Optional[List[Dict[str, Any]]]:
+async def get_cached_related_news(news_id: int, category_id: int) -> list[dict[str, Any]] | None:
     return await get_json_cache(f"{RELATED_NEWS_PREFIX}{news_id}:{category_id}")
 
 
 # ---------- 分类新闻总数（列表分页用，避免每次请求都 count(*)） ----------
-async def get_cached_news_count(category_id: int) -> Optional[int]:
+async def get_cached_news_count(category_id: int) -> int | None:
     """返回缓存的总数；未命中返回 None（0 是合法缓存值，不会与未命中混淆）"""
     return await get_json_cache(f"{NEWS_COUNT_PREFIX}{category_id}")
 

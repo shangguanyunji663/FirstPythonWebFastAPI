@@ -51,7 +51,7 @@
 import { onMounted } from 'vue';
 import { useUserStore } from '../store/user';
 import { useRouter } from 'vue-router';
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { showDialog, showToast } from 'vant';
 import TabBar from '../components/TabBar.vue';
 import { useI18n } from 'vue-i18n';

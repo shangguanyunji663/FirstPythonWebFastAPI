@@ -1,6 +1,6 @@
-from typing import Literal, Optional
+from typing import Literal
 
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class UserRequest(BaseModel):
@@ -24,10 +24,10 @@ class UserInfoBase(BaseModel):
     """
     用户信息基础数据模型
     """
-    nickname: Optional[str] = Field(None, max_length=50, description="昵称")
-    avatar: Optional[str] = Field(None, max_length=255, description="头像URL")
-    gender: Optional[str] = Field(None, max_length=10, description="性别")
-    bio: Optional[str] = Field(None, max_length=500, description="个人简介")
+    nickname: str | None = Field(None, max_length=50, description="昵称")
+    avatar: str | None = Field(None, max_length=255, description="头像URL")
+    gender: str | None = Field(None, max_length=10, description="性别")
+    bio: str | None = Field(None, max_length=500, description="个人简介")
 
 
 class UserInfoResponse(UserInfoBase):
@@ -54,11 +54,11 @@ class UserAuthResponse(BaseModel):
 
 # 更新用户信息的模型类：校验与数据库列定义对齐，gender 限定枚举值
 class UserUpdateRequest(BaseModel):
-    nickname: Optional[str] = Field(None, max_length=50, description="昵称")
-    avatar: Optional[str] = Field(None, max_length=255, description="头像URL")
-    gender: Optional[Literal["male", "female", "unknown"]] = Field(None, description="性别")
-    bio: Optional[str] = Field(None, max_length=500, description="个人简介")
-    phone: Optional[str] = Field(None, pattern=r"^1[3-9]\d{9}$", description="手机号")
+    nickname: str | None = Field(None, max_length=50, description="昵称")
+    avatar: str | None = Field(None, max_length=255, description="头像URL")
+    gender: Literal["male", "female", "unknown"] | None = Field(None, description="性别")
+    bio: str | None = Field(None, max_length=500, description="个人简介")
+    phone: str | None = Field(None, pattern=r"^1[3-9]\d{9}$", description="手机号")
 
 
 class UserChangePasswordRequest(BaseModel):

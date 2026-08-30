@@ -61,7 +61,7 @@ const { t } = useI18n();
 const username = ref('');
 const password = ref('');
 
-const onSubmit = async (values) => {
+const onSubmit = async (_values) => {
   // 显示加载提示
   showToast({
     type: 'loading',
@@ -90,7 +90,7 @@ const onSubmit = async (values) => {
         message: result.message
       });
     }
-  } catch (error) {
+  } catch {
     showToast({
       type: 'fail',
       message: t('login.failed')

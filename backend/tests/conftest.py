@@ -9,10 +9,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from main import app  # noqa: F401  导入即注册全部模型到 Base.metadata
-from config.db_conf import get_db
 import config.cache_conf
 import crud.news_cache
+from config.db_conf import get_db
+from main import app  # noqa: F401  导入即注册全部模型到 Base.metadata
 from models.base import Base
 from utils import rate_limit
 

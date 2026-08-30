@@ -1,13 +1,13 @@
 """缓存层单元测试：fakeredis 上验证读写、空值占位、TTL 抖动、模式删除"""
 from cache.news_cache import (
     EMPTY,
+    _with_jitter,
     get_cached_categories,
     get_cached_news_count,
     get_json_cache,
     set_cache,
     set_cache_categories,
     set_cache_news_count,
-    _with_jitter,
 )
 from config.cache_conf import delete_cache, delete_cache_pattern
 

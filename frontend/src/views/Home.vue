@@ -12,7 +12,7 @@
     <div class="category-tabs">
       <van-tabs v-model:active="activeTab" sticky swipeable animated>
         <van-tab
-          v-for="(category, index) in displayCategories"
+          v-for="category in displayCategories"
           :key="category.id"
           :title="getCategoryTranslation(category.name)"
         >

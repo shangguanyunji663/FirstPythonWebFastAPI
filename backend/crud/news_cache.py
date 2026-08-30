@@ -1,23 +1,22 @@
 from fastapi.encoders import jsonable_encoder
-from sqlalchemy import select, func, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config.db_conf import AsyncSessionLocal
 from cache.news_cache import (
     EMPTY,
-    get_cached_categories,
-    set_cache_categories,
-    get_cache_news_list,
-    set_cache_news_list,
-    get_cached_news_detail,
     cache_news_detail,
-    get_cached_related_news,
     cache_related_news,
+    get_cache_news_list,
+    get_cached_categories,
     get_cached_news_count,
-    set_cache_news_count,
+    get_cached_news_detail,
+    get_cached_related_news,
     invalidate_news_caches,
-    invalidate_category_caches,
+    set_cache_categories,
+    set_cache_news_count,
+    set_cache_news_list,
 )
+from config.db_conf import AsyncSessionLocal
 from models.news import Category, News
 from schemas.base import NewsItemBase
 from schemas.news import NewsDetailResponse, RelatedNewsResponse

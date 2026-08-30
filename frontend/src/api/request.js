@@ -31,7 +31,7 @@ function readPersistedToken() {
   try {
     const saved = localStorage.getItem('user-store');
     return saved ? JSON.parse(saved).token || null : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

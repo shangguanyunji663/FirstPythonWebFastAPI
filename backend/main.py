@@ -2,9 +2,9 @@ import logging
 import os
 
 from fastapi import FastAPI
-from routers import ai, favorite, history, news, users
 from fastapi.middleware.cors import CORSMiddleware
 
+from routers import ai, favorite, history, news, users
 from utils.exception_handlers import register_exception_handlers
 
 # 日志配置：级别走环境变量（DEBUG/INFO/WARNING...），默认 INFO

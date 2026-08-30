@@ -5,8 +5,7 @@ from starlette import status
 from config.db_conf import get_db
 from crud import history
 from models.users import User
-from schemas.history import (HistoryAddRequest, HistoryAddResponse, HistoryListResponse,
-                             HistoryNewsItemResponse)
+from schemas.history import HistoryAddRequest, HistoryAddResponse, HistoryListResponse, HistoryNewsItemResponse
 from schemas.response import APIResponse
 from utils.auth import get_current_user
 
@@ -77,5 +76,5 @@ async def clear_history(user: User = Depends(get_current_user),
     """
     清空历史记录
     """
-    result = await history.clear_history(db, user.id)
-    return {"code": 200, "message": "清空成功", "data": None}
+    count = await history.clear_history(db, user.id)
+    return {"code": 200, "message": f"清空成功，共{count}条", "data": None}

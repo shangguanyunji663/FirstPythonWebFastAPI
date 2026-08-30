@@ -1,0 +1,21 @@
+# ruff 配置：只保留高质量规则，不做风格化强改（格式交给编辑器/Prettier 类工具）
+line-length = 120
+target-version = "py311"
+
+exclude = [".conda-env", "__pycache__", ".venv"]
+
+[lint]
+select = [
+    "E",  # pycodestyle 错误
+    "W",  # pycodestyle 警告
+    "F",  # pyflakes：未使用导入/变量、f-string 问题等
+    "I",  # isort 导入排序
+    "B",  # bugbear：常见 bug 模式
+    "UP", # pyupgrade：过时语法升级
+]
+ignore = [
+    "B008", # FastAPI 依赖注入的标准写法就是 `db: Session = Depends(get_db)`
+]
+
+[lint.isort]
+known-first-party = ["cache", "config", "crud", "models", "routers", "schemas", "utils"]

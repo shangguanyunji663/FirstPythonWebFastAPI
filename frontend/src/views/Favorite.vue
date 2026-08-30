@@ -84,7 +84,7 @@ onMounted(async () => {
       // 如果API请求失败，回退到本地存储
       // favoriteStore.loadFavorites();
     }
-  } catch (error) {
+  } catch {
     favoriteStore.loadFavorites();
   }
 });

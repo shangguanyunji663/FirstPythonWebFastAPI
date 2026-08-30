@@ -3,7 +3,6 @@ from sqlalchemy import select
 
 from cache.news_cache import NEWS_COUNT_PREFIX, NEWS_DETAIL_PREFIX
 from models.news import News
-
 from tests.conftest import auth_headers
 
 CATEGORIES_PATH = "/api/news/categories"

@@ -1,4 +1,4 @@
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -9,4 +9,4 @@ class APIResponse(BaseModel, Generic[T]):
     """统一响应包络：所有接口返回 {code, message, data} 三键结构"""
     code: int = 200
     message: str = "success"
-    data: Optional[T] = None
+    data: T | None = None

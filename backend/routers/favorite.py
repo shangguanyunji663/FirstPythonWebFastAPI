@@ -5,8 +5,13 @@ from starlette import status
 from config.db_conf import get_db
 from crud import favorite
 from models.users import User
-from schemas.favorite import (FavoriteAddRequest, FavoriteAddResponse, FavoriteCheckResponse,
-                              FavoriteListResponse, FavoriteNewsItemResponse)
+from schemas.favorite import (
+    FavoriteAddRequest,
+    FavoriteAddResponse,
+    FavoriteCheckResponse,
+    FavoriteListResponse,
+    FavoriteNewsItemResponse,
+)
 from schemas.response import APIResponse
 from utils.auth import get_current_user
 

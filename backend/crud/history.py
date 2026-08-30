@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import select, func, delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.history import History

@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import Optional
 
-from sqlalchemy import Index, Integer, String, Enum, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, Integer, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -22,12 +21,12 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="用户ID")
     username: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, comment="用户名")
     password: Mapped[str] = mapped_column(String(255), nullable=False, comment="密码（加密存储）")
-    nickname: Mapped[Optional[str]] = mapped_column(String(50), comment="昵称")
-    avatar: Mapped[Optional[str]] = mapped_column(String(255), comment="头像URL",
+    nickname: Mapped[str | None] = mapped_column(String(50), comment="昵称")
+    avatar: Mapped[str | None] = mapped_column(String(255), comment="头像URL",
                                                   default='https://fastly.jsdelivr.net/npm/@vant/assets/cat.jpeg')
-    gender: Mapped[Optional[str]] = mapped_column(Enum('male', 'female', 'unknown'), comment="性别", default='unknown')
-    bio: Mapped[Optional[str]] = mapped_column(String(500), comment="个人简介", default='这个人很懒，什么都没留下')
-    phone: Mapped[Optional[str]] = mapped_column(String(20), unique=True, comment="手机号")
+    gender: Mapped[str | None] = mapped_column(Enum('male', 'female', 'unknown'), comment="性别", default='unknown')
+    bio: Mapped[str | None] = mapped_column(String(500), comment="个人简介", default='这个人很懒，什么都没留下')
+    phone: Mapped[str | None] = mapped_column(String(20), unique=True, comment="手机号")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment="创建时间")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now,
                                                  comment="更新时间")

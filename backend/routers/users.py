@@ -2,13 +2,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette import status
 
-from models.users import User
-from schemas.response import APIResponse
-from schemas.users import UserRequest, UserLoginRequest, UserAuthResponse, UserInfoResponse, UserUpdateRequest, \
-    UserChangePasswordRequest
-
 from config.db_conf import get_db
 from crud import users
+from models.users import User
+from schemas.response import APIResponse
+from schemas.users import (
+    UserAuthResponse,
+    UserChangePasswordRequest,
+    UserInfoResponse,
+    UserLoginRequest,
+    UserRequest,
+    UserUpdateRequest,
+)
 from utils.auth import get_current_user
 from utils.rate_limit import check_login_rate_limit, reset_login_attempts
 
