@@ -1,5 +1,5 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 
 // https://vite.dev/config/
@@ -10,6 +10,11 @@ export default defineConfig({
       // 路径别名：组件内可用 @/store/user 代替 ../../store/user
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+  },
+  test: {
+    // vitest 配置：jsdom 提供 localStorage/DOM，globals 允许 describe/it 直接使用
+    environment: 'jsdom',
+    globals: true,
   },
   server: {
     proxy: {
