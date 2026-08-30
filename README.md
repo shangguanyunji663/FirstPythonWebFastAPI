@@ -25,12 +25,12 @@ flowchart TB
     end
 
     subgraph STORE["存储"]
-        MY[("MySQL 8<br/>news_app · 8 张表")]
+        MY[("MySQL 8<br/>news_app · 7 张表")]
         RD[("Redis<br/>新闻 / 分类 / 列表缓存")]
     end
 
     subgraph EXT["外部服务"]
-        RSS["公开 RSS 源<br/>少数派 / Solidot / IT之家 / 人民网 / 华尔街见闻"]
+        RSS["公开 RSS 源<br/>少数派 / Solidot / IT之家 / 极客公园 / 人民网 / 华尔街见闻"]
         ZP["智谱 GLM<br/>OpenAI 兼容接口"]
         OL["本地 Ollama"]
     end
@@ -50,7 +50,7 @@ flowchart TB
     SC -.->|"失效分类缓存"| CA
 ```
 
-整体链路：前端 axios 携带 Token 调用 REST 接口；新闻数据由种子数据与 RSS 定时爬虫共同提供（启动即抓一次，之后每 6 小时，入库后自动失效对应分类缓存）；AI 对话由后端代理转发到智谱或本地 Ollama，密钥只存后端 `.env`。
+整体链路：前端 axios 携带 Token 调用 REST 接口；新闻数据由种子数据与 RSS 定时爬虫共同提供（启动即抓一次，之后默认每 6 小时，`CRAWL_INTERVAL_HOURS` 可调，入库后自动失效对应分类缓存）；AI 对话由后端代理转发到智谱或本地 Ollama，密钥只存后端 `.env`。
 
 ### 界面预览
 
@@ -76,7 +76,7 @@ flowchart TB
 - **数据库**: MySQL
 - **ORM**: SQLAlchemy (异步)
 - **数据库驱动**: aiomysql
-- **密码加密**: passlib + bcrypt
+- **密码加密**: bcrypt（直接使用，不经过停更的 passlib）
 - **缓存系统**: Redis
 - **AI 代理**: httpx（异步转发智谱/本地 Ollama 的 OpenAI 兼容接口）
 - **定时爬虫**: APScheduler + feedparser + selectolax（RSS 定时抓取与解析）
@@ -98,7 +98,7 @@ FoundGoldenNews/                        # 仓库根目录
 │   │   ├── ai.py                       # AI聊天记录相关数据库操作
 │   │   ├── favorite.py                 # 收藏相关数据库操作
 │   │   ├── history.py                  # 历史记录相关数据库操作
-│   │   ├── news_cache.py               # 新闻相关数据库操作（含缓存读写与失效）
+│   │   ├── news.py                     # 新闻相关数据库操作（含缓存读写与失效）
 │   │   └── users.py                    # 用户相关数据库操作
 │   ├── models/                         # 数据模型定义（SQLAlchemy）
 │   ├── routers/                        # API路由定义
@@ -137,7 +137,7 @@ FoundGoldenNews/                        # 仓库根目录
 │   └── screenshots/                    # 界面截图（README 展示用）
 │
 ├── database/
-│   └── database.sql                    # 建库建表 SQL（含 8 张表）
+│   └── database.sql                    # 建库建表 SQL（含 7 张表）
 │
 ├── .gitignore
 └── README.md
@@ -162,7 +162,7 @@ conda env create -f environment.yml -p .conda-env
 # 2. 配置环境变量：复制模板并按需修改
 cp .env.example .env
 
-# 3. 初始化数据库（创建 news_app 库与 8 张表）
+# 3. 初始化数据库（创建 news_app 库与 7 张表）
 mysql -uroot -p --default-character-set=utf8mb4 < ../database/database.sql
 # PowerShell 用户不支持 "<" 重定向，改用以下任一方式：
 #   cmd /c "mysql -uroot -p --default-character-set=utf8mb4 < ..\database\database.sql"
@@ -193,13 +193,13 @@ npm run dev
 ### 运行测试
 
 ```bash
-# 后端：pytest 41 例（用户/新闻/收藏/历史接口 + 缓存层 + 爬虫）
+# 后端：pytest 48 例（用户/新闻/收藏/历史接口 + 缓存层 + 爬虫 + 登录限流）
 # 基于 aiosqlite + fakeredis 模拟，无需真实 MySQL/Redis
 cd backend
 conda run -p .conda-env python -m pytest
 ruff check .   # lint；ruff 不随 requirements 安装，需先 pip install ruff
 
-# 前端：vitest 16 例 + ESLint
+# 前端：vitest 18 例 + ESLint
 cd frontend
 npm run test
 npm run lint
@@ -215,11 +215,13 @@ npm run lint
 | `LOG_LEVEL` | 日志级别（DEBUG/INFO/WARNING/ERROR） | INFO |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_DB` / `REDIS_PASSWORD` | Redis 连接信息 | localhost / 6379 / 0 / 空 |
 | `CORS_ORIGINS` | 生产环境前端来源白名单（逗号分隔） | 空 |
-| `CRAWLER_ENABLED` | 是否启动 RSS 定时抓取（启动即抓一次，之后每 6 小时；开发热重载可设 false） | true |
+| `CRAWLER_ENABLED` | 是否启动 RSS 定时抓取（启动即抓一次，之后按 `CRAWL_INTERVAL_HOURS` 轮询；开发热重载可设 false） | true |
 | `AI_PROVIDER` | AI 提供方：`zhipu`（智谱云端）/ `ollama`（本地） | zhipu |
 | `AI_API_KEY` | 智谱 API Key（不入库；provider=ollama 时无需） | 空 |
+| `AI_BASE_URL` | 智谱 OpenAI 兼容端点（走自建中转/代理时覆盖；provider=ollama 时无效） | https://open.bigmodel.cn/api/paas/v4/chat/completions |
 | `AI_MODEL` | AI 模型名 | glm-4.7-flash |
 | `OLLAMA_BASE_URL` | 本地 Ollama 服务地址 | http://localhost:11434 |
+| `CRAWL_INTERVAL_HOURS` | RSS 定时抓取间隔（小时） | 6 |
 
 ### 前端环境变量（frontend/.env.local，模板见 frontend/.env.example）
 
@@ -290,10 +292,9 @@ npm run lint
 2. **用户令牌表 (user_token)** —— 用户认证令牌管理，支持令牌过期机制；仅存令牌的 SHA-256 摘要，原始令牌只在注册/登录响应中返回一次
 3. **新闻分类表 (news_category)** —— 新闻分类信息
 4. **新闻表 (news)** —— 新闻内容存储，包含标题、内容、作者、浏览量等字段
-5. **关联新闻表 (related_news)** —— 新闻间关联关系
-6. **收藏表 (favorite)** —— 用户收藏记录，关联用户和新闻
-7. **浏览历史表 (history)** —— 用户浏览历史记录，关联用户和新闻
-8. **AI对话表 (ai_chat)** —— 用户 AI 问答记录
+5. **收藏表 (favorite)** —— 用户收藏记录，关联用户和新闻
+6. **浏览历史表 (history)** —— 用户浏览历史记录，关联用户和新闻
+7. **AI对话表 (ai_chat)** —— 用户 AI 问答记录
 
 ## 1-7 缓存设计
 
@@ -310,7 +311,7 @@ npm run lint
     - 过期时间: 30分钟
 
 3. **分类数据缓存**
-    - 缓存键: `news:categories`
+    - 缓存键: `news:categories:{skip}:{limit}`（分页参数编入键，不同分页互不串页）
     - 过期时间: 2小时
 
 4. **分类新闻总数缓存**
@@ -326,7 +327,7 @@ npm run lint
 
 - 新闻浏览量写库成功后，自动失效该新闻的详情与相关新闻缓存（写后失效策略）
 - 采用缓存失效而非主动更新策略
-- 空结果（不存在的新闻/分类）写入 60 秒短 TTL 占位，防止缓存穿透
+- 空结果（不存在的新闻/分类/相关新闻无结果）写入 60 秒短 TTL 占位，防止缓存穿透
 - 各类缓存 TTL 附加 ±10% 随机抖动，避免同类键集中过期引发缓存雪崩
 - Redis 不可用时自动降级为直连数据库
 

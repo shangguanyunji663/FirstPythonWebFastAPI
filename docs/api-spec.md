@@ -626,7 +626,7 @@ DELETE /api/history/delete/1
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
 | message | string | 是 | 用户消息，1~4000 字符 |
-| history | array | 否 | 历史对话 `[{role, content}]`，后端最多取最近 10 条 |
+| history | array | 否 | 历史对话 `[{role, content}]`，`role` 仅允许 `user` / `assistant`，`content` 1~4000 字符；后端最多取最近 10 条 |
 
 - **请求示例**:
 
@@ -682,7 +682,7 @@ data: [DONE]
 
 ### 数据采集模块
 
-> 新闻数据由后端内置的 RSS 爬虫采集：应用启动时先抓取一次，之后每 6 小时自动抓取公开源（源列表与间隔见 `backend/crawler/sources.py`），按（标题，分类）去重入库，并自动失效对应分类的缓存。`.env` 中设置 `CRAWLER_ENABLED=false` 可整体关闭定时抓取。
+> 新闻数据由后端内置的 RSS 爬虫采集：应用启动时先抓取一次，之后每 `CRAWL_INTERVAL_HOURS`（默认 6）小时自动抓取公开源（源列表见 `backend/crawler/sources.py`），按（标题，分类）去重入库，并自动失效对应分类的缓存。`.env` 中设置 `CRAWLER_ENABLED=false` 可整体关闭定时抓取。
 
 #### 1. 手动触发抓取
 
