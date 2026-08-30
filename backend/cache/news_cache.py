@@ -22,6 +22,14 @@ EMPTY = object()  # 内存哨兵：getter 返回它表示“缓存命中但数�
 EMPTY_TTL = 60  # 空结果占位的短过期时间（秒），新数据写入后最多延迟 1 分钟可见
 
 
+def _detect_empty(data):
+    """识别空值占位：写侧有两种形态——裸 marker（详情）与 [marker]（分类/列表包一层保持结构一致）。
+    读取侧统一在这里还原成 EMPTY 哨兵，避免占位数据泄漏给调用方"""
+    if data == EMPTY_MARKER:
+        return True
+    return isinstance(data, list) and len(data) == 1 and data[0] == EMPTY_MARKER
+
+
 def _with_jitter(expire: int) -> int:
     """TTL 加 ±10% 随机抖动：同类 key 过期时间错开，避免同一时刻集中失效（缓存雪崩）"""
     return int(expire * random.uniform(0.9, 1.1))
@@ -30,7 +38,7 @@ def _with_jitter(expire: int) -> int:
 # ---------- 新闻分类 ----------
 async def get_cached_categories():
     data = await get_json_cache(CATEGORIES_KEY)
-    if data == EMPTY_MARKER:
+    if _detect_empty(data):
         return EMPTY
     return data
 
@@ -51,7 +59,7 @@ def _list_key(category_id: Optional[int], page: int, size: int) -> str:
 
 async def get_cache_news_list(category_id: Optional[int], page: int, size: int):
     data = await get_json_cache(_list_key(category_id, page, size))
-    if data == EMPTY_MARKER:
+    if _detect_empty(data):
         return EMPTY
     return data
 
@@ -67,7 +75,7 @@ async def set_cache_news_list(category_id: Optional[int], page: int, size: int,
 # ---------- 新闻详情 ----------
 async def get_cached_news_detail(news_id: int) -> Optional[Dict[str, Any]]:
     data = await get_json_cache(f"{NEWS_DETAIL_PREFIX}{news_id}")
-    if data == EMPTY_MARKER:
+    if _detect_empty(data):
         return EMPTY
     return data
 
