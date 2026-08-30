@@ -74,28 +74,6 @@ CREATE TABLE IF NOT EXISTS `news` (
     ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='新闻表';
 
--- 相关新闻关联表（推荐系统）
-CREATE TABLE IF NOT EXISTS `related_news` (
-  `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '关联ID',
-  `news_id` INT UNSIGNED NOT NULL COMMENT '新闻ID',
-  `related_news_id` INT UNSIGNED NOT NULL COMMENT '相关新闻ID',
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `news_related_unique` (`news_id` ASC, `related_news_id` ASC),
-  INDEX `fk_related_news_news_idx` (`news_id` ASC),
-  INDEX `fk_related_news_related_idx` (`related_news_id` ASC),
-  CONSTRAINT `fk_related_news_news`
-    FOREIGN KEY (`news_id`)
-    REFERENCES `news` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_related_news_related`
-    FOREIGN KEY (`related_news_id`)
-    REFERENCES `news` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='相关新闻关联表';
-
 -- 收藏表
 CREATE TABLE IF NOT EXISTS `favorite` (
   `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '收藏ID',

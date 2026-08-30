@@ -9,7 +9,12 @@ from starlette import status
 
 # 调试模式：开启时异常详情（含堆栈）会返回给客户端，仅限本地开发使用
 # 通过环境变量 DEBUG_MODE 控制，默认关闭，避免泄露 SQL、路径等内部信息
-DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+# 每次处理异常时实时读取（而非模块导入时读取一次），不依赖 load_dotenv 的导入顺序
+
+
+def _debug_mode() -> bool:
+    return os.getenv("DEBUG_MODE", "false").lower() == "true"
+
 
 # 唯一约束名 -> 用户提示文案（与 database.sql / models 中的约束名对应）
 CONSTRAINT_MESSAGES = {
@@ -18,7 +23,6 @@ CONSTRAINT_MESSAGES = {
     "token_UNIQUE": "令牌生成冲突，请重试",
     "name_UNIQUE": "分类名称已存在",
     "user_news_unique": "已收藏过该新闻",
-    "news_related_unique": "关联新闻记录重复",
 }
 
 # 列名 -> 用户提示文案：SQLite（如测试环境）的报错不含约束名，
@@ -29,7 +33,6 @@ COLUMN_MESSAGES = {
     "user_token.token": "令牌生成冲突，请重试",
     "news_category.name": "分类名称已存在",
     "favorite.user_id, favorite.news_id": "已收藏过该新闻",
-    "related_news.news_id, related_news.related_id": "关联新闻记录重复",
 }
 
 
@@ -100,7 +103,7 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
 
     # 开发模式下返回详细错误信息
     error_data = None
-    if DEBUG_MODE:
+    if _debug_mode():
         error_data = {
             "error_type": "IntegrityError",
             "error_detail": error_msg,
@@ -123,7 +126,7 @@ async def sqlalchemy_error_handler(request: Request, exc: SQLAlchemyError):
     """
     # 开发模式下返回详细错误信息
     error_data = None
-    if DEBUG_MODE:
+    if _debug_mode():
         error_data = {
             "error_type": type(exc).__name__,
             "error_detail": str(exc),
@@ -148,7 +151,7 @@ async def general_exception_handler(request: Request, exc: Exception):
     """
     # 开发模式下返回详细错误信息
     error_data = None
-    if DEBUG_MODE:
+    if _debug_mode():
         error_data = {
             "error_type": type(exc).__name__,
             "error_detail": str(exc),

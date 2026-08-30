@@ -2,7 +2,7 @@ import json
 import logging
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -94,12 +94,12 @@ async def chat(
 
 @router.get("/history", response_model=APIResponse[AIChatHistoryResponse])
 async def get_history(
-        limit: int = 20,
+        limit: int = Query(20, ge=1, le=100),
         user: User = Depends(get_current_user),
         db: AsyncSession = Depends(get_db)
 ):
     """当前用户的 AI 聊天历史（时间正序，最多 limit 条）"""
-    records = await ai_crud.get_chat_history(db, user.id, min(max(limit, 1), 100))
+    records = await ai_crud.get_chat_history(db, user.id, limit)
     data = AIChatHistoryResponse(
         list=[AIChatRecordResponse.model_validate(r) for r in records],
         total=len(records),
