@@ -17,5 +17,7 @@ if AI_PROVIDER == "ollama":
     AI_BASE_URL = f"{OLLAMA_BASE_URL}/v1/chat/completions"
     AI_HEADERS = {"Content-Type": "application/json", "Authorization": "Bearer ollama"}
 else:
-    AI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+    # 智谱 OpenAI 兼容端点：走自建中转/代理时用 AI_BASE_URL 环境变量覆盖
+    # 用 or 而不是 getenv 默认值参数：.env 里"设了但为空"也回退官方端点
+    AI_BASE_URL = os.getenv("AI_BASE_URL") or "https://open.bigmodel.cn/api/paas/v4/chat/completions"
     AI_HEADERS = {"Content-Type": "application/json", "Authorization": f"Bearer {AI_API_KEY}"}

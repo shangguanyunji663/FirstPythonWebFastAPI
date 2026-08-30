@@ -22,7 +22,8 @@ async_engine = create_async_engine(
     ASYNC_DATABASE_URL,
     echo=os.getenv("SQL_ECHO", "false").lower() == "true",  # 输出SQL日志，默认关闭
     pool_size=10,  # 设置连接池中保持的持久连接数
-    max_overflow=20  # 设置连接池允许创建的额外连接数
+    max_overflow=20,  # 设置连接池允许创建的额外连接数
+    pool_pre_ping=True,  # 取连接前探活：MySQL wait_timeout 掐掉闲置连接后自动重建，避免"Gone away"500
 )
 
 # 创建异步会话工厂
