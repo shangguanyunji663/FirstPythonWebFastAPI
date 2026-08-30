@@ -1,8 +1,29 @@
-from typing import Optional
+from datetime import datetime
+from typing import List, Optional
 
 from pydantic import Field, ConfigDict, BaseModel
 
 from schemas.base import NewsItemBase
+
+
+class CategoryResponse(BaseModel):
+    """新闻分类响应"""
+    id: int
+    name: str
+    sort_order: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class NewsListResponse(BaseModel):
+    """新闻列表响应"""
+    list: List[NewsItemBase]
+    total: int
+    has_more: bool = Field(alias="hasMore")
+
+    model_config = ConfigDict(populate_by_name=True, from_attributes=True)
 
 
 class RelatedNewsResponse(BaseModel):

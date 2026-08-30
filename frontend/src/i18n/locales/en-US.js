@@ -12,7 +12,8 @@ export default {
     login: 'Login',
     register: 'Register',
     logout: 'Logout',
-    allCategories: 'All Categories'
+    allCategories: 'All Categories',
+    tip: 'Notice'
   },
   nav: {
     home: 'Home',
@@ -42,7 +43,62 @@ export default {
     title: 'AI Chat',
     placeholder: 'Enter your question...',
     send: 'Send',
-    thinking: 'AI is thinking...'
+    thinking: 'AI is thinking...',
+    welcome: 'Hello! I am your AI assistant. How can I help you?',
+    loginRequired: 'Please log in before using the AI assistant',
+    errorOccurred: 'An error occurred: {message}',
+    networkError: 'Please check your network connection and API settings',
+    requestFailed: 'Request failed ({status})',
+    noResponse: 'Sorry, I am unable to generate a reply. Please try again later.'
+  },
+  newsDetail: {
+    title: 'News Detail',
+    views: '{n} views',
+    related: 'Related Recommendations',
+    loginToFavorite: 'Please log in first to add favorites',
+    addedToFavorites: 'Added to favorites',
+    removedFromFavorites: 'Removed from favorites',
+    operationFailed: 'Operation failed. Please try again later'
+  },
+  login: {
+    title: 'Login',
+    username: 'Username',
+    usernamePlaceholder: 'Enter your username',
+    usernameRequired: 'Username is required',
+    password: 'Password',
+    passwordPlaceholder: 'Enter your password',
+    passwordRequired: 'Password is required',
+    submit: 'Log In',
+    submitting: 'Logging in...',
+    failed: 'Login failed. Please try again later'
+  },
+  register: {
+    title: 'Sign Up',
+    confirmPassword: 'Confirm Password',
+    confirmPasswordPlaceholder: 'Enter your password again',
+    confirmPasswordRequired: 'Please confirm your password',
+    passwordMismatch: 'Passwords do not match',
+    submit: 'Sign Up',
+    submitting: 'Signing up...',
+    failed: 'Registration failed. Please try again later',
+    hasAccount: 'Already have an account?',
+    goLogin: 'Log In'
+  },
+  favorite: {
+    timeLabel: 'Favorited',
+    clear: 'Clear',
+    empty: 'No favorites yet',
+    confirmDelete: 'Are you sure you want to delete this favorite?',
+    confirmClear: 'Are you sure you want to clear all favorites?'
+  },
+  history: {
+    timeLabel: 'Viewed',
+    clear: 'Clear',
+    empty: 'No browsing history yet',
+    confirmDelete: 'Are you sure you want to delete this browsing record?',
+    confirmClear: 'Are you sure you want to clear all browsing history?',
+    deleteFailed: 'Failed to delete. Please try again later',
+    clearFailed: 'Failed to clear. Please try again later'
   },
   my: {
     title: 'My',
@@ -74,6 +130,25 @@ export default {
     title: 'Profile',
     username: 'Username',
     bio: 'Bio',
-    save: 'Save Changes'
+    save: 'Save Changes',
+    avatar: 'Avatar',
+    accountId: 'Account ID',
+    noBio: 'No bio yet',
+    changePassword: 'Change Password',
+    currentPassword: 'Current password: ',
+    newPassword: 'New password: ',
+    confirmPassword: 'Confirm password: ',
+    currentPasswordRequired: 'Please enter your current password',
+    newPasswordRequired: 'Please enter a new password',
+    passwordMismatch: 'Passwords do not match',
+    updating: 'Updating...',
+    saving: 'Saving...',
+    passwordChangeSuccess: 'Password changed successfully',
+    passwordChangeFailed: 'Failed to change password',
+    editBio: 'Edit Bio',
+    bioLabel: 'Bio: ',
+    bioUpdateSuccess: 'Bio updated successfully',
+    bioUpdateFailed: 'Failed to update bio',
+    getUserInfoFailed: 'Failed to get user info'
   }
 };

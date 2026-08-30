@@ -1,8 +1,8 @@
 <template>
   <div class="news-detail">
     <van-nav-bar
-      title="新闻详情"
-      left-text="返回"
+      :title="$t('newsDetail.title')"
+      :left-text="$t('common.back')"
       left-arrow
       @click-left="onClickLeft"
       fixed
@@ -22,7 +22,7 @@
       <div class="info">
         <span>{{ newsStore.newsDetail.author }}</span>
         <span>{{ newsStore.newsDetail.publishTime }}</span>
-        <span>{{ newsStore.newsDetail.views }} 阅读</span>
+        <span>{{ $t('newsDetail.views', { n: newsStore.newsDetail.views }) }}</span>
       </div>
       
       <div class="cover" v-if="newsStore.newsDetail.image">
@@ -36,7 +36,7 @@
       </div>
       
       <div class="related-news" v-if="newsStore.newsDetail.relatedNews?.length">
-        <h3>相关推荐</h3>
+        <h3>{{ $t('newsDetail.related') }}</h3>
         <div class="related-list">
           <div 
             class="related-item" 
@@ -53,7 +53,7 @@
       </div>
     </div>
     
-    <van-empty v-else description="加载中..." />
+    <van-empty v-else :description="$t('common.loading')" />
   </div>
 </template>
 
@@ -65,9 +65,11 @@ import { useHistoryStore } from '../store/modules/history'
 import { useFavoriteStore } from '../store/modules/favorite'
 import { useUserStore } from '../store/user'
 import { showToast } from 'vant'
+import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const newsStore = useNewsStore()
 const historyStore = useHistoryStore()
 const favoriteStore = useFavoriteStore()
@@ -103,30 +105,30 @@ const toggleFavorite = async () => {
   if (!userStore.getLoginStatus) {
     // 未登录则跳转到登录页
     showToast({
-      message: '请先登录后再收藏',
+      message: t('newsDetail.loginToFavorite'),
       position: 'bottom',
     })
     router.push('/login')
     return
   }
-  
+
   // 已登录则调用API切换收藏状态
   const status = await favoriteStore.toggleFavorite(newsStore.newsDetail)
-  
+
   if (status === true) {
     showToast({
-      message: '已添加到收藏',
+      message: t('newsDetail.addedToFavorites'),
       position: 'bottom',
     })
   } else if (status === false) {
     showToast({
-      message: '已取消收藏',
+      message: t('newsDetail.removedFromFavorites'),
       position: 'bottom',
     })
   } else {
     // status为null表示操作失败
     showToast({
-      message: '操作失败，请稍后重试',
+      message: t('newsDetail.operationFailed'),
       position: 'bottom',
     })
   }
@@ -142,7 +144,6 @@ onMounted(async () => {
     if (userStore.getLoginStatus) {
       try {
         const result = await historyStore.addHistoryApi(newsStore.newsDetail.id);
-        console.log('记录浏览历史API结果:', result);
       } catch (error) {
         console.error('记录浏览历史API失败:', error);
       }

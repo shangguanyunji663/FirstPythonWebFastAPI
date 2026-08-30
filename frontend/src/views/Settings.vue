@@ -116,8 +116,6 @@ const changeLanguage = () => {
   locale.value = currentLanguage.value;
   showLanguagePopup.value = false;
   showToast(t('settings.languageChanged'));
-  // 强制刷新页面以应用语言更改
-  window.location.reload();
 };
 </script>
 

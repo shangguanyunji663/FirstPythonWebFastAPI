@@ -164,7 +164,7 @@ backend/
 ├── models/          # 模型层：数据库表在 Python 里的映射（只管"表长什么样"）
 ├── cache/           # 缓存键与读写封装（只管"Redis 怎么用"）
 ├── config/          # 配置：数据库/Redis 连接（只管"连到哪"）
-└── utils/           # 横切工具：认证、密码哈希、统一响应、异常处理
+└── utils/           # 横切工具：认证、密码哈希、限流、异常处理
 ```
 
 **依赖方向必须是单向的**：`routers → crud → models`。反向依赖（crud 里 import routers）是架构坏味道——本项目唯一一处反例是 `crud/users.py:90` 抛了 Web 层的 `HTTPException`，属于历史遗留（见第 21 章）。
@@ -414,7 +414,7 @@ bcrypt 自带**盐**（同样密码每次哈希结果都不同，防彩虹表）
 ```python
 router = APIRouter(prefix="/api/user", tags=["users"])   # 本文件所有接口共享前缀
 
-@router.post("/register")
+@router.post("/register", response_model=APIResponse[UserAuthResponse])   # 声明响应结构
 async def register(user_data: UserRequest,                       # 请求体自动按 Pydantic 校验
                    db: AsyncSession = Depends(get_db)):          # 依赖注入拿 db 会话
     existing_user = await users.get_user_by_username(db, user_data.username)
@@ -422,18 +422,23 @@ async def register(user_data: UserRequest,                       # 请求体自�
         raise HTTPException(status_code=400, detail="用户已存在")   # 主动抛=返回错误响应
     user = await users.create_user(db, user_data)
     token = await users.create_token(db, user.id)
-    response_data = UserAuthResponse(token=token, user_info=UserInfoResponse.model_validate(user))
-    return success_response(message="注册成功", data=response_data)
+    return {
+        "code": 200,
+        "message": "注册成功",
+        "data": UserAuthResponse(token=token, user_info=UserInfoResponse.model_validate(user)),
+    }
 ```
 
-**统一响应结构**（`utils/response.py`）：所有接口都返回 `{"code": 200, "message": "...", "data": ...}` 三键结构，前端只写一次解析逻辑：
+**统一响应结构**（`schemas/response.py`）：所有接口都返回 `{"code": 200, "message": "...", "data": ...}` 三键结构，前端只写一次解析逻辑：
 
 ```python
-def success_response(message: str = "success", data=None):
-    return JSONResponse(content=jsonable_encoder({"code": 200, "message": message, "data": data}))
+class APIResponse(BaseModel, Generic[T]):
+    code: int = 200
+    message: str = "success"
+    data: Optional[T] = None
 ```
 
-`jsonable_encoder` 负责把 Pydantic 模型/ORM 对象/datetime 全部转成 JSON 可表达的类型，且**默认按 alias 输出**——这就是第 9 章别名能生效的原因。
+它是**泛型模型**：每个路由通过 `response_model=APIResponse[该接口的数据模型]` 声明"data 里装什么"，FastAPI 据此自动完成序列化（datetime→字符串、ORM→dict）和 OpenAPI 文档生成，且**序列化默认按 alias 输出**——这就是第 9 章别名能生效的原因。
 
 知识点：
 
@@ -686,6 +691,7 @@ app.include_router(users.router)
 
 - **统一请求器**：`frontend/src/api/request.js` 创建了 axios 实例（baseURL 读 `VITE_API_BASE_URL`，默认 `http://127.0.0.1:8000`），请求拦截器自动加 `Authorization: Bearer <token>`，响应拦截器遇到 401 清除本地登录态。**所以前端永远不需要手动拼鉴权头**。
 - **接口消费点**：每个业务页面的数据都走 Pinia store——`store/user.js` 调用户 5 接口，`store/modules/news.js` 调新闻 3 接口，`favorite.js`/`history.js` 调收藏与历史。
+- **AI 问答**：`views/AIChat.vue` 用 fetch 调后端代理 `/api/ai/chat`（SSE 流式），前端零密钥；提供方（智谱/Ollama）与 Key 都在后端 `.env`。
 - **Token 存哪**：登录成功后 token 存进 Pinia 并经 `pinia-plugin-persistedstate` 持久化到 localStorage（键 `user-store`），页面刷新不丢。
 - **联调时的跨域**：开发模式后端 CORS 全放开直接调；若想摆脱 CORS，前端 vite 代理已备好（`vite.config.js` 的 `/api-proxy`）。
 - **联调排错**：前端报"网络请求失败"先看后端终端日志和 `/docs` 能否手工调通——99% 是后端问题或参数名大小写不符（对照 `docs/api-spec.md` 的 alias）。
@@ -718,10 +724,11 @@ app.include_router(users.router)
 |------|--------|----------|
 | token 表方案（每请求查 2 次库） | 教学上最直白 | 迁移 JWT（`pyjwt`）：签发自包含令牌免查库；前置是前端所有请求已统一走 request.js |
 | 事务"双轨"：crud 内自行 commit + `get_db` 收尾 commit | 简单场景两套都能跑 | 统一为 crud 自管写事务、`get_db` 只管连接生命周期 |
-| 响应未全部挂 `response_model` | 现有手拼 dict 能跑 | 给每个路由声明 Pydantic 响应模型，`/docs` 会自动长出响应结构 |
+| 响应模型 | 已统一：全部路由挂 `response_model=APIResponse[...]`，`schemas/response.py` 的泛型包络 | —— |
+| 详情/列表时间字段曾两套命名（publishTime 与 publish_time） | 已修复：统一为 `publishTime`（`schemas/base.py` 别名） | —— |
 | 无数据库迁移（表靠 `database.sql`） | 表结构稳定、项目规模小 | 引入 Alembic：模型变更自动生成迁移脚本（前置：统一 metadata，已完成） |
 | 无自动化测试 | —— | pytest + httpx 异步客户端，先覆盖注册/登录/列表/收藏主链路 |
-| 详情接口 `publishTime`（驼峰）与列表 `publish_time`（下划线）并存 | 历史命名 | response_model 统一时一并规范 |
+| 事务"双轨"：crud 内自行 commit + `get_db` 收尾 commit | 简单场景两套都能跑 | 统一为 crud 自管写事务、`get_db` 只管连接生命周期 |
 
 ---
 
@@ -732,7 +739,7 @@ app.include_router(users.router)
 - [ ] `config/`：连接串从 `.env` 拼出；Redis 客户端带超时
 - [ ] `models/`：5 个模型 + 统一 Base + TimestampMixin；`datetime.now` 不带括号
 - [ ] `schemas/`：各模块 Request/Response，alias 与 `docs/api-spec.md` 一致
-- [ ] `utils/`：bcrypt 哈希自测通过；`success_response` 三键结构
+- [ ] `utils/`：bcrypt 哈希自测通过；`schemas/response.py` 的 `APIResponse` 泛型包络
 - [ ] `crud/users.py`：注册后 user 表有 bcrypt 密码行
 - [ ] `routers/users.py`：/docs 全链路（注册→登录→信息→改密）
 - [ ] `utils/auth.py`：错误 token 401，正确 token 200

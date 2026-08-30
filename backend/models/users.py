@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Index, Integer, String, Enum, DateTime, ForeignKey
+from sqlalchemy import Index, Integer, String, Enum, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from models.base import Base
@@ -47,6 +47,7 @@ class UserToken(Base):
     __table_args__ = (
         Index('token_UNIQUE', 'token'),
         Index('fk_user_token_user_idx', 'user_id'),
+        UniqueConstraint('user_id', name='uq_user_token_user'),  # 每用户仅一条有效令牌
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="令牌ID")

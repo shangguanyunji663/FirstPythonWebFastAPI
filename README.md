@@ -15,6 +15,7 @@
 - **数据库驱动**: aiomysql
 - **密码加密**: passlib + bcrypt
 - **缓存系统**: Redis
+- **AI 代理**: httpx（异步转发智谱/本地 Ollama 的 OpenAI 兼容接口）
 - **环境管理**: conda（项目内独立环境，见 `backend/environment.yml`）
 
 **前端**
@@ -30,6 +31,7 @@
 FoundGoldenNews/                        # 仓库根目录
 ├── backend/                            # 后端（FastAPI）
 │   ├── crud/                           # 数据访问层（CRUD操作）
+│   │   ├── ai.py                       # AI聊天记录相关数据库操作
 │   │   ├── favorite.py                 # 收藏相关数据库操作
 │   │   ├── history.py                  # 历史记录相关数据库操作
 │   │   ├── news_cache.py               # 新闻相关数据库操作（含缓存读写与失效）
@@ -38,8 +40,9 @@ FoundGoldenNews/                        # 仓库根目录
 │   ├── routers/                        # API路由定义
 │   ├── schemas/                        # 数据验证模型（Pydantic）
 │   ├── cache/                          # 缓存键与序列化封装
-│   ├── utils/                          # 工具函数（认证/异常/响应）
+│   ├── utils/                          # 工具函数（认证/限流/异常）
 │   ├── config/                         # 配置相关
+│   │   ├── ai_conf.py                  # AI提供方配置（读环境变量）
 │   │   ├── db_conf.py                  # 数据库配置（读环境变量）
 │   │   └── cache_conf.py               # Redis缓存配置（读环境变量）
 │   ├── main.py                         # 应用入口文件
@@ -120,17 +123,18 @@ npm run dev
 | `LOG_LEVEL` | 日志级别（DEBUG/INFO/WARNING/ERROR） | INFO |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_DB` / `REDIS_PASSWORD` | Redis 连接信息 | localhost / 6379 / 0 / 空 |
 | `CORS_ORIGINS` | 生产环境前端来源白名单（逗号分隔） | 空 |
+| `AI_PROVIDER` | AI 提供方：`zhipu`（智谱云端）/ `ollama`（本地） | zhipu |
+| `AI_API_KEY` | 智谱 API Key（不入库；provider=ollama 时无需） | 空 |
+| `AI_MODEL` | AI 模型名 | glm-4.7-flash |
+| `OLLAMA_BASE_URL` | 本地 Ollama 服务地址 | http://localhost:11434 |
 
 ### 前端环境变量（frontend/.env.local，模板见 frontend/.env.example）
 
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
 | `VITE_API_BASE_URL` | 后端 API 基础地址 | http://127.0.0.1:8000 |
-| `VITE_AI_PROVIDER` | AI 提供方：`zhipu`（智谱云端）/ `ollama`（本地） | zhipu |
-| `VITE_AI_API_KEY` | 智谱 API Key（不入库） | 空 |
-| `VITE_AI_MODEL` | 智谱模型 | glm-4.7-flash |
-| `VITE_OLLAMA_BASE_URL` | 本地 Ollama 服务地址 | http://localhost:11434 |
-| `VITE_OLLAMA_MODEL` | 本地 Ollama 模型（需先 ollama pull） | qwen3:4b |
+
+> AI 问答的提供方与密钥统一在 backend/.env 配置，前端不持有任何 Key。
 
 ## 1-5 功能模块
 
@@ -164,7 +168,12 @@ npm run dev
 - 删除单条浏览记录
 - 清空浏览历史
 
-### 5. 缓存模块
+### 5. AI 问答模块
+
+- AI 对话（SSE 流式，后端代理智谱/本地 Ollama，密钥由后端 .env 管理）
+- 聊天历史记录（落库 ai_chat 表）
+
+### 6. 缓存模块
 
 - 新闻详情缓存
 - 新闻列表缓存
@@ -266,6 +275,13 @@ Redis 连接信息通过 `backend/.env` 环境变量配置（模板见 `.env.exa
 | `/api/history/delete/{history_id}` | DELETE | 删除单条浏览记录 |
 | `/api/history/clear`               | DELETE | 清空浏览历史     |
 
+### AI 问答相关接口
+
+| 接口                | 方法 | 说明                                        |
+| ------------------- | ---- | ------------------------------------------- |
+| `/api/ai/chat`      | POST | AI 对话（SSE 流式，走后端代理）             |
+| `/api/ai/history`   | GET  | 获取聊天历史（落库 `ai_chat` 表）           |
+
 ## 1-9 认证机制
 
 系统使用基于令牌(Token)的认证机制：
@@ -281,6 +297,7 @@ Redis 连接信息通过 `backend/.env` 环境变量配置（模板见 `.env.exa
 - 用户认证失败返回 401 状态码
 - 资源不存在返回 404 状态码
 - 数据库约束冲突返回 400 状态码（按具体约束返回对应提示）
+- 登录尝试过于频繁返回 429 状态码（同一用户名 60 秒内最多 5 次，`utils/rate_limit.py`）
 - 服务器内部错误返回 500 状态码
 - 堆栈等调试信息仅在 `DEBUG_MODE=true` 时返回
 

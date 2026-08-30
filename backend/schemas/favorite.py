@@ -13,6 +13,16 @@ class FavoriteAddRequest(BaseModel):
     news_id: int = Field(..., alias="newsId")
 
 
+class FavoriteAddResponse(BaseModel):
+    """添加收藏成功的返回"""
+    id: int
+    user_id: int = Field(alias="userId")
+    news_id: int = Field(alias="newsId")
+    created_at: datetime = Field(alias="favoriteTime")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 # 规划两个类： 一个是新闻模型类 + 收藏的模型类
 class FavoriteNewsItemResponse(NewsItemBase):
     favorite_id: int = Field(alias="favoriteId")

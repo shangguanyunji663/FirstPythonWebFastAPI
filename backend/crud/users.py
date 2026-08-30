@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timedelta
 
 from fastapi import HTTPException
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.users import User, UserToken
@@ -34,6 +34,10 @@ async def create_token(db: AsyncSession, user_id: int):
     token = str(uuid.uuid4())
     # timedelta(days=7, hours=2, minutes=30, seconds=10)
     expires_at = datetime.now() + timedelta(days=7)
+
+    # 顺手清理已过期的令牌，避免 user_token 表无限膨胀
+    await db.execute(delete(UserToken).where(UserToken.expires_at < datetime.now()))
+
     query = select(UserToken).where(UserToken.user_id == user_id)
     result = await db.execute(query)
     user_token = result.scalar_one_or_none()

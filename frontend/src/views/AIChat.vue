@@ -1,6 +1,6 @@
 <template>
   <div class="ai-chat-container">
-    <van-nav-bar title="AI问答" fixed />
+    <van-nav-bar :title="$t('aiChat.title')" fixed />
     
     <div class="chat-content">
       <div class="messages-container" ref="messagesContainer">
@@ -26,7 +26,7 @@
           rows="1"
           autosize
           type="textarea"
-          placeholder="请输入问题..."
+          :placeholder="$t('aiChat.placeholder')"
           class="chat-input"
           @keypress.enter.prevent="sendMessage"
         />
@@ -36,7 +36,7 @@
           :disabled="isLoading || !userInput.trim()" 
           @click="sendMessage"
         >
-          发送
+          {{ $t('aiChat.send') }}
         </van-button>
       </div>
     </div>
@@ -51,21 +51,21 @@ import TabBar from '../components/TabBar.vue';
 import { showToast } from 'vant';
 import * as marked from 'marked';
 import DOMPurify from 'dompurify';
-import { aiChatConfig } from '../config/api';
+import { apiConfig, aiConfig } from '../config/api';
+import { useUserStore } from '../store/user';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 // 聊天消息
 const messages = ref([
-  { role: 'assistant', content: '你好！我是AI助手，有什么可以帮助你的吗？' }
+  { role: 'assistant', content: t('aiChat.welcome') }
 ]);
 const userInput = ref('');
 const messagesContainer = ref(null);
 const isLoading = ref(false);
 
-// 从配置文件获取API设置
-const apiEndpoint = ref(aiChatConfig.apiEndpoint);
-const apiKey = ref(aiChatConfig.apiKey);
-const model = ref(aiChatConfig.model);
-const provider = ref(aiChatConfig.provider);
+const userStore = useUserStore();
 
 // 格式化消息内容（支持Markdown）
 const formatMessage = (content) => {
@@ -78,9 +78,9 @@ const formatMessage = (content) => {
 const sendMessage = async () => {
   if (!userInput.value.trim() || isLoading.value) return;
   
-  // 检查API设置
-  if (!apiKey.value || apiKey.value === 'your-api-key-here') {
-    showToast('API Key未配置，请联系管理员');
+  // 检查登录状态（AI 接口需要认证）
+  if (!userStore.getLoginStatus) {
+    showToast(t('aiChat.loginRequired'));
     return;
   }
   
@@ -103,7 +103,7 @@ const sendMessage = async () => {
   } catch (error) {
     console.error('Error fetching AI response:', error);
     // 更新最后一条消息为错误信息
-    messages.value[messages.value.length - 1].content = `发生错误: ${error.message || '请检查网络连接和API设置'}`;
+    messages.value[messages.value.length - 1].content = t('aiChat.errorOccurred', { message: error.message || t('aiChat.networkError') });
   } finally {
     isLoading.value = false;
     await nextTick();
@@ -111,77 +111,73 @@ const sendMessage = async () => {
   }
 };
 
-// 获取AI响应（使用SSE）
+// 获取AI响应（后端代理接口，SSE 流式）
 const fetchAIResponse = async (userMessage) => {
-  const allMessages = messages.value
-    .slice(0, -1) // 排除最后一个空的assistant消息
+  // 历史对话：排除当前轮（最后的占位 assistant 与当前 user 消息）
+  const history = messages.value
+    .slice(0, -2)
     .map(msg => ({ role: msg.role, content: msg.content }));
-  
-  try {
-    const response = await fetch(apiEndpoint.value, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey.value}`
-      },
-      body: JSON.stringify({
-        model: model.value,
-        messages: allMessages,
-        stream: true,
-        // 关闭深度思考，回复直接流式输出（仅智谱 GLM 系列识别该参数）
-        ...(provider.value === 'zhipu' ? { thinking: { type: 'disabled' } } : {})
-      })
-    });
-    
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new Error(error.error?.message || `HTTP error! status: ${response.status}`);
-    }
-    
-    // 处理SSE流
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let aiResponse = '';
-  
+
+  const response = await fetch(`${apiConfig.baseURL}${aiConfig.chatEndpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${userStore.token}`
+    },
+    body: JSON.stringify({ message: userMessage, history })
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || t('aiChat.requestFailed', { status: response.status }));
+  }
+
+  // 处理SSE流（后端透传模型服务的 data: 行）
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let aiResponse = '';
+
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    
+
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
     buffer = lines.pop() || '';
-    
+
     for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const data = line.slice(6);
-        if (data === '[DONE]') continue;
-        
-        try {
-          const json = JSON.parse(data);
-          // 标准 OpenAI 兼容流式格式（智谱 v4 接口兼容）
-          const content = json.choices?.[0]?.delta?.content || '';
-          if (content) {
-            aiResponse += content;
-            // 更新最后一条消息
-            messages.value[messages.value.length - 1].content = aiResponse;
-            await nextTick();
-            scrollToBottom();
-          }
-        } catch (e) {
+      if (!line.startsWith('data: ')) continue;
+      const data = line.slice(6);
+      if (data === '[DONE]') continue;
+
+      try {
+        const json = JSON.parse(data);
+        // 后端代理返回的业务错误（如 AI 服务限流/不可用）
+        if (json.error) {
+          throw new Error(json.error);
+        }
+        const content = json.choices?.[0]?.delta?.content || '';
+        if (content) {
+          aiResponse += content;
+          // 更新最后一条消息
+          messages.value[messages.value.length - 1].content = aiResponse;
+          await nextTick();
+          scrollToBottom();
+        }
+      } catch (e) {
+        if (e instanceof SyntaxError) {
           console.error('Error parsing SSE data:', e);
+        } else {
+          throw e;
         }
       }
     }
   }
-  
+
   // 如果没有收到任何内容
   if (!aiResponse) {
-    messages.value[messages.value.length - 1].content = '抱歉，我无法生成回复。请检查API设置或稍后再试。';
-  }
-  } catch (error) {
-    console.error('Fetch error:', error);
-    throw error;
+    messages.value[messages.value.length - 1].content = t('aiChat.noResponse');
   }
 };
 

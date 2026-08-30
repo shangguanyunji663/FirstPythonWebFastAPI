@@ -2,7 +2,7 @@
 
 ## 概述
 
-本文档详细描述了新闻系统的API接口，包括用户管理、新闻浏览、收藏和历史记录等功能模块。
+本文档详细描述了新闻系统的API接口，包括用户管理、新闻浏览、收藏、历史记录和AI问答等功能模块。
 
 ## 基础URL
 
@@ -44,6 +44,7 @@ Authorization: Bearer <token值>
 | 401 | 未认证或令牌无效/过期 | `无效的令牌或已经过期的令牌` |
 | 404 | 资源不存在 | `新闻不存在` / `收藏记录不存在` / `历史记录不存在` |
 | 422 | 请求参数校验失败（如分页参数小于 1、新密码少于 6 位） | FastAPI 默认校验错误信息 |
+| 429 | 登录尝试过于频繁（同一用户名 60 秒内超过 5 次） | `登录尝试过于频繁，请稍后再试` |
 | 500 | 服务器内部错误 | `服务器内部错误` |
 
 > 仅当后端 `.env` 中 `DEBUG_MODE=true`（仅限本地开发）时，错误响应的 `data` 才会附带异常类型、详情与堆栈，生产环境一律返回 `null`。
@@ -198,6 +199,8 @@ Authorization: Bearer <token值>
 | oldPassword | string | 是 | 当前密码 |
 | newPassword | string | 是 | 新密码，最少 6 位 |
 
+- **错误响应**: 旧密码错误返回 400，`message` 为 `旧密码不正确`（非 500）
+
 - **请求示例**:
 
 ```json
@@ -226,8 +229,8 @@ Authorization: Bearer <token值>
 
 | 参数名 | 类型 | 必填 | 说明 |
 |--------|------|------|------|
-| skip | integer | 否 | 跳过的记录数，默认为0 |
-| limit | integer | 否 | 返回的记录数限制，默认为100 |
+| skip | integer | 否 | 跳过的记录数，默认为0，最小值为0 |
+| limit | integer | 否 | 返回的记录数限制，默认为100，取值范围 1~200 |
 
 - **请求示例**:
 
@@ -282,16 +285,13 @@ GET /api/news/list?categoryId=1&page=2&pageSize=20
     "list": [
       {
         "id": 1,
-        "publish_time": "2023-01-01T00:00:00",
-        "created_at": "2023-01-01T00:00:00",
-        "updated_at": "2023-01-01T00:00:00",
         "title": "新闻标题",
         "description": "新闻简介",
-        "content": "新闻内容",
         "image": null,
         "author": null,
-        "category_id": 1,
-        "views": 0
+        "categoryId": 1,
+        "views": 0,
+        "publishTime": "2023-01-01T00:00:00"
       }
     ],
     "total": 100,
@@ -299,6 +299,8 @@ GET /api/news/list?categoryId=1&page=2&pageSize=20
   }
 }
 ```
+
+> 列表项为 `NewsItemBase` 结构（不含正文 content；正文请调详情接口）。
 
 #### 3. 获取新闻详情
 
@@ -458,7 +460,7 @@ GET /api/favorite/list?page=1&pageSize=10
         "author": "",
         "categoryId": 1,
         "views": 1,
-        "publishedTime": "2023-01-01T00:00:00",
+        "publishTime": "2023-01-01T00:00:00",
         "favoriteId": 1,
         "favoriteTime": "2023-01-01T00:00:00"
       }
@@ -552,7 +554,7 @@ GET /api/history/list?page=1&pageSize=10
         "author": "",
         "categoryId": 1,
         "views": 1,
-        "publishedTime": "2023-01-01T00:00:00",
+        "publishTime": "2023-01-01T00:00:00",
         "historyId": 1,
         "viewTime": "2023-01-01T00:00:00"
       }
@@ -600,5 +602,72 @@ DELETE /api/history/delete/1
   "code": 200,
   "message": "清空成功",
   "data": null
+}
+```
+### AI 问答模块
+
+> AI 问答走后端代理：前端不持有任何模型服务密钥，提供方（智谱 / 本地 Ollama）由后端 `.env` 的 `AI_PROVIDER` 配置。对话记录自动落库 `ai_chat` 表。
+
+#### 1. AI 对话（SSE 流式）
+
+- **接口地址**: `POST /api/ai/chat`
+- **请求头**: 需要认证
+- **响应类型**: `text/event-stream`（SSE 流式，不是普通 JSON）
+- **请求参数**:
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| message | string | 是 | 用户消息，1~4000 字符 |
+| history | array | 否 | 历史对话 `[{role, content}]`，后端最多取最近 10 条 |
+
+- **请求示例**:
+
+```json
+{
+  "message": "帮我总结一下今天的科技新闻",
+  "history": [
+    { "role": "user", "content": "你好" },
+    { "role": "assistant", "content": "你好，有什么可以帮你？" }
+  ]
+}
+```
+
+- **响应格式（SSE）**: 每行为 `data: <JSON>`，JSON 为 OpenAI 兼容的流式 chunk（取 `choices[0].delta.content` 累加即为回答）；以 `data: [DONE]` 结束；出错时返回 `data: {"error": "错误说明"}`：
+
+```
+data: {"choices":[{"delta":{"content":"今天"}}]}
+
+data: {"choices":[{"delta":{"content":"的科技新闻…"}}]}
+
+data: [DONE]
+```
+
+#### 2. 获取聊天历史
+
+- **接口地址**: `GET /api/ai/history`
+- **请求头**: 需要认证
+- **请求参数**:
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| limit | integer | 否 | 返回条数，默认20，取值范围 1~100（时间正序） |
+
+- **响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "获取聊天历史成功",
+  "data": {
+    "list": [
+      {
+        "id": 1,
+        "message": "你好",
+        "response": "你好，有什么可以帮你？",
+        "createdAt": "2023-01-01T00:00:00"
+      }
+    ],
+    "total": 1
+  }
 }
 ```

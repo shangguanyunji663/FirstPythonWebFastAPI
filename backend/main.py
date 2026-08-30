@@ -2,7 +2,7 @@ import logging
 import os
 
 from fastapi import FastAPI
-from routers import news, users, favorite, history
+from routers import ai, favorite, history, news, users
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.exception_handlers import register_exception_handlers
@@ -40,8 +40,15 @@ app.add_middleware(
 async def root():
     return {"message": "Hello World"}
 
+
+@app.get("/health")
+async def health():
+    """健康检查端点"""
+    return {"status": "ok"}
+
 # 挂载路由/注册路由
 app.include_router(news.router)
 app.include_router(users.router)
 app.include_router(favorite.router)
 app.include_router(history.router)
+app.include_router(ai.router)

@@ -7,3 +7,4 @@ passlib==1.7.4
 bcrypt==3.2.0
 uvicorn==0.40.0
 python-dotenv==1.2.2
+httpx==0.28.1

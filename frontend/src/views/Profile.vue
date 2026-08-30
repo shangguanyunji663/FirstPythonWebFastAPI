@@ -1,15 +1,15 @@
 <template>
   <div class="profile-page">
     <van-nav-bar
-      title="个人信息"
+      :title="$t('profile.title')"
       left-arrow
       @click-left="$router.back()"
       fixed
     />
-    
+
     <div class="profile-container">
       <van-cell-group inset class="avatar-group">
-        <van-cell title="头像" center>
+        <van-cell :title="$t('profile.avatar')" center>
           <template #right-icon>
             <van-image
               round
@@ -20,15 +20,15 @@
           </template>
         </van-cell>
       </van-cell-group>
-      
+
       <van-cell-group inset class="info-group">
-        <van-cell title="用户名" :value="userInfo.username || 'admin'" />
-        <van-cell title="账号ID" :value="`ID: heima-${userId || 'N/A'}`" />
-        <van-cell title="个人简介" :value="userBio || '暂无简介'" is-link @click="showBioDialog" />
+        <van-cell :title="$t('profile.username')" :value="userInfo.username || 'admin'" />
+        <van-cell :title="$t('profile.accountId')" :value="`ID: heima-${userId || 'N/A'}`" />
+        <van-cell :title="$t('profile.bio')" :value="userBio || $t('profile.noBio')" is-link @click="showBioDialog" />
       </van-cell-group>
-      
+
       <van-cell-group inset class="security-group">
-        <van-cell title="修改密码" is-link @click="showPasswordConfirm" />
+        <van-cell :title="$t('profile.changePassword')" is-link @click="showPasswordConfirm" />
       </van-cell-group>
     </div>
   </div>
@@ -37,13 +37,13 @@
 <script setup>
 import { ref, computed, h, onMounted } from 'vue';
 import { useUserStore } from '../store/user';
-import { showDialog, showToast, showLoadingToast, showSuccessToast, showFailToast } from 'vant';
+import { showDialog, showToast, showLoadingToast, showSuccessToast, showFailToast, closeToast } from 'vant';
 import { useRouter } from 'vue-router';
-import axios from 'axios';
-import { apiConfig } from '../config/api';
+import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
 const userStore = useUserStore();
+const { t } = useI18n();
 
 // 初始化用户状态
 onMounted(async () => {
@@ -52,57 +52,54 @@ onMounted(async () => {
     router.push('/login');
     return;
   }
-  
+
   // 获取用户信息
   try {
     // 显示加载提示
     const loadingInstance = showLoadingToast({
-      message: '加载中...',
+      message: t('common.loading'),
       forbidClick: true,
       duration: 0
     });
-    
-    // console.log('获取用户信息，当前token:', userStore.token);
-    
+
     // 使用新的 getUserInfoDetail 方法
     const result = await userStore.getUserInfoDetail();
-    
+
     // 手动关闭加载提示
     loadingInstance.close();
-    
+
     if (result.success) {
-      console.log('获取用户信息成功:', userStore.userInfo);
       // 显示成功提示
-      // showSuccessToast('获取用户信息成功');
+      // showSuccessToast(t('profile.title'));
     } else {
       console.error('获取用户信息失败:', result.message);
-      showFailToast(result.message || '获取用户信息失败');
+      showFailToast(result.message || t('profile.getUserInfoFailed'));
     }
   } catch (error) {
     console.error('获取用户信息请求失败:', error);
     // 确保关闭加载提示
-    showToast.clear();
-    showToast.fail('获取用户信息失败');
+    closeToast();
+    showToast({ type: 'fail', message: t('profile.getUserInfoFailed') });
   }
 });
 
 const userInfo = computed(() => userStore.userInfo);
 const userId = computed(() => userStore.token ? userStore.token.substring(0, 5) : '');
-const userBio = computed(() => userStore.userInfo?.bio || '暂无简介');
+const userBio = computed(() => userStore.userInfo?.bio || t('profile.noBio'));
 
 const showPasswordConfirm = () => {
   // 使用ref创建响应式变量
   const oldPassword = ref('');
   const newPassword = ref('');
   const confirmPassword = ref('');
-  
+
   showDialog({
-    title: '修改密码',
+    title: t('profile.changePassword'),
     showCancelButton: true,
     className: 'password-dialog',
     message: h('div', { style: 'text-align: left; padding: 10px 0;' }, [
       h('div', { style: 'margin-bottom: 15px;' }, [
-        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, '当前密码：'),
+        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, t('profile.currentPassword')),
         h('input', {
           type: 'password',
           value: oldPassword.value,
@@ -111,7 +108,7 @@ const showPasswordConfirm = () => {
         })
       ]),
       h('div', { style: 'margin-bottom: 15px;' }, [
-        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, '新密码：'),
+        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, t('profile.newPassword')),
         h('input', {
           type: 'password',
           value: newPassword.value,
@@ -120,7 +117,7 @@ const showPasswordConfirm = () => {
         })
       ]),
       h('div', { style: 'margin-bottom: 15px;' }, [
-        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, '确认密码：'),
+        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, t('profile.confirmPassword')),
         h('input', {
           type: 'password',
           value: confirmPassword.value,
@@ -132,43 +129,43 @@ const showPasswordConfirm = () => {
   }).then(async () => {
     // 点击确认按钮
     if (!oldPassword.value) {
-      showToast('请输入当前密码');
+      showToast(t('profile.currentPasswordRequired'));
       return;
     }
-    
+
     if (!newPassword.value) {
-      showToast('请输入新密码');
+      showToast(t('profile.newPasswordRequired'));
       return;
     }
-    
+
     if (newPassword.value !== confirmPassword.value) {
-      showToast('两次密码输入不一致');
+      showToast(t('profile.passwordMismatch'));
       return;
     }
-    
+
     try {
       // 显示加载提示
       const loadingInstance = showLoadingToast({
-        message: '修改中...',
+        message: t('profile.updating'),
         forbidClick: true,
         duration: 0
       });
-      
+
       // 调用API更新密码
       const result = await userStore.updatePassword(oldPassword.value, newPassword.value);
-      
+
       // 关闭加载提示
       loadingInstance.close();
-      
+
       if (result && result.success) {
-        showSuccessToast('密码修改成功');
+        showSuccessToast(t('profile.passwordChangeSuccess'));
       } else {
-        showFailToast((result && result.message) || '密码修改失败');
+        showFailToast((result && result.message) || t('profile.passwordChangeFailed'));
       }
     } catch (error) {
       console.error('修改密码失败:', error);
-      showToast.clear();
-      showToast.fail('密码修改失败');
+      closeToast();
+      showToast({ type: 'fail', message: t('profile.passwordChangeFailed') });
     }
   }).catch(() => {
     // 点击取消按钮
@@ -178,15 +175,15 @@ const showPasswordConfirm = () => {
 const showBioDialog = () => {
   // 使用ref创建响应式变量
   const newBioValue = ref(userBio.value);
-  
+
   showDialog({
-    title: '修改个人简介',
+    title: t('profile.editBio'),
     showCancelButton: true,
-    confirmButtonText: '确认',
+    confirmButtonText: t('common.confirm'),
     className: 'bio-dialog',
     message: h('div', { style: 'text-align: left; padding: 10px 0;' }, [
       h('div', { style: 'margin-bottom: 15px;' }, [
-        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, '个人简介：'),
+        h('div', { style: 'margin-bottom: 5px; text-align: left;' }, t('profile.bioLabel')),
         h('textarea', {
           value: newBioValue.value,
           onInput: (e) => { newBioValue.value = e.target.value },
@@ -199,28 +196,26 @@ const showBioDialog = () => {
     try {
       // 显示加载提示
       const loadingInstance = showLoadingToast({
-        message: '保存中...',
+        message: t('profile.saving'),
         forbidClick: true,
         duration: 0
       });
-      
-      console.log('更新个人简介:', newBioValue.value);
-      
+
       // 调用API更新个人简介
       const result = await userStore.updateUserBio(newBioValue.value);
-      
+
       // 关闭加载提示
       loadingInstance.close();
-      
+
       if (result && result.success) {
-        showSuccessToast('个人简介修改成功');
+        showSuccessToast(t('profile.bioUpdateSuccess'));
       } else {
-        showFailToast((result && result.message) || '个人简介修改失败');
+        showFailToast((result && result.message) || t('profile.bioUpdateFailed'));
       }
     } catch (error) {
       console.error('更新个人简介失败:', error);
-      showToast.clear();
-      showToast.fail('个人简介修改失败');
+      closeToast();
+      showToast({ type: 'fail', message: t('profile.bioUpdateFailed') });
     }
   }).catch(() => {
     // 点击取消按钮

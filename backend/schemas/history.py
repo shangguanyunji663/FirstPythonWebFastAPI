@@ -12,6 +12,16 @@ class HistoryAddRequest(BaseModel):
     news_id: int = Field(..., alias="newsId")
 
 
+class HistoryAddResponse(BaseModel):
+    """添加历史记录的返回"""
+    id: int
+    user_id: int = Field(alias="userId")
+    news_id: int = Field(alias="newsId")
+    view_time: datetime = Field(alias="viewTime")
+
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
 class HistoryNewsItemResponse(NewsItemBase):
     """
     浏览历史列表中的新闻项响应

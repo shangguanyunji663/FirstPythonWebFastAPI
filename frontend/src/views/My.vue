@@ -118,7 +118,7 @@ const handleLogout = () => {
       userStore.logout();
       router.push('/login');
     }
-  });
+  }).catch(() => {});
 };
 
 // 获取用户信息

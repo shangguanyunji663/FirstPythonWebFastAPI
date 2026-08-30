@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS `user_token` (
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   PRIMARY KEY (`id`),
   UNIQUE INDEX `token_UNIQUE` (`token` ASC),
+  UNIQUE INDEX `uq_user_token_user` (`user_id` ASC),
   INDEX `fk_user_token_user_idx` (`user_id` ASC),
   CONSTRAINT `fk_user_token_user`
     FOREIGN KEY (`user_id`)
