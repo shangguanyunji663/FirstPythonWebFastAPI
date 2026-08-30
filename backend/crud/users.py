@@ -42,11 +42,13 @@ async def create_token(db: AsyncSession, user_id: int):
     result = await db.execute(query)
     user_token = result.scalar_one_or_none()
 
+    # 库里只存令牌摘要，原始 token 仅在登录响应中返回一次
+    token_digest = security.hash_token(token)
     if user_token:
-        user_token.token = token
+        user_token.token = token_digest
         user_token.expires_at = expires_at
     else:
-        user_token = UserToken(user_id=user_id, token=token, expires_at=expires_at)
+        user_token = UserToken(user_id=user_id, token=token_digest, expires_at=expires_at)
         db.add(user_token)
         await db.commit()
 
@@ -65,7 +67,8 @@ async def authenticate_user(db: AsyncSession, username: str, password: str):
 
 # 根据 Token 查询用户：验证 Token → 查询用户
 async def get_user_by_token(db: AsyncSession, token: str):
-    query = select(UserToken).where(UserToken.token == token)
+    # 请求头里的原始 token 摘要后与库中比对
+    query = select(UserToken).where(UserToken.token == security.hash_token(token))
     result = await db.execute(query)
     db_token = result.scalar_one_or_none()
 
