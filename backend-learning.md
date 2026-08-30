@@ -403,7 +403,7 @@ def verify_password(plain_password, hashed_password):
 
 bcrypt 自带**盐**（同样密码每次哈希结果都不同，防彩虹表），所以验证必须交给 `verify` 而不是自己再 hash 一次比对字符串。MD5/SHA1 一律不要用于密码。
 
-**复现要点**：两行函数 + 一个自测：`get_hash_password("123456")` 跑两次结果不同，但 `verify_password("123456", 两次结果)` 都为 True。
+**复现要点**：两行函数 + 一个自测：`get_hash_password("demo-pass-001")` 跑两次结果不同，但 `verify_password("demo-pass-001", 两次结果)` 都为 True。
 
 ---
 

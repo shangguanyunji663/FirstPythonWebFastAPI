@@ -92,7 +92,11 @@ conda env create -f environment.yml -p .conda-env
 cp .env.example .env
 
 # 3. 初始化数据库（创建 news_app 库与 8 张表）
-mysql -uroot -p < ../database/database.sql
+mysql -uroot -p --default-character-set=utf8mb4 < ../database/database.sql
+# PowerShell 用户不支持 "<" 重定向，改用以下任一方式：
+#   cmd /c "mysql -uroot -p --default-character-set=utf8mb4 < ..\database\database.sql"
+#   或进入 mysql 客户端后执行: source D:/你的路径/FoundGoldenNews/database/database.sql
+# 注意：重复导入时分类/用户会自动跳过（INSERT IGNORE），但 news 表无唯一键、会追加重复新闻，请勿重复导入
 
 # 4. 启动服务
 conda activate ./.conda-env
