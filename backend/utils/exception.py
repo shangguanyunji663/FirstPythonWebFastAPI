@@ -21,6 +21,17 @@ CONSTRAINT_MESSAGES = {
     "news_related_unique": "关联新闻记录重复",
 }
 
+# 列名 -> 用户提示文案：SQLite（如测试环境）的报错不含约束名，
+# 格式为 "UNIQUE constraint failed: 表.列"，按列名兜底匹配
+COLUMN_MESSAGES = {
+    "user.username": "用户名已存在",
+    "user.phone": "手机号已被注册",
+    "user_token.token": "令牌生成冲突，请重试",
+    "news_category.name": "分类名称已存在",
+    "favorite.user_id, favorite.news_id": "已收藏过该新闻",
+    "related_news.news_id, related_news.related_id": "关联新闻记录重复",
+}
+
 
 # Pydantic v2 错误 type -> 用户提示（未收录的类型回退到原始 msg）
 VALIDATION_MESSAGE_MAP = {
@@ -75,8 +86,10 @@ async def integrity_error_handler(request: Request, exc: IntegrityError):
     """
     error_msg = str(exc.orig)
 
-    # 先按具体约束名精确映射，再兜底通用判断
+    # 先按具体约束名精确映射（MySQL），再按列名兜底（SQLite），最后通用判断
     detail = next((msg for name, msg in CONSTRAINT_MESSAGES.items() if name in error_msg), None)
+    if detail is None:
+        detail = next((msg for col, msg in COLUMN_MESSAGES.items() if col in error_msg), None)
     if detail is None:
         if "Duplicate entry" in error_msg:
             detail = "数据已存在，请勿重复提交"
