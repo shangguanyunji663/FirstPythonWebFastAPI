@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS `news` (
   PRIMARY KEY (`id`),
   INDEX `fk_news_category_idx` (`category_id` ASC),
   INDEX `idx_publish_time` (`publish_time` DESC),
+  UNIQUE INDEX `title_category_UNIQUE` (`title` ASC, `category_id` ASC) COMMENT '同分类下标题唯一：爬虫/重复导入去重',
   CONSTRAINT `fk_news_category`
     FOREIGN KEY (`category_id`)
     REFERENCES `news_category` (`id`)
@@ -159,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `ai_chat` (
 -- 初始化数据
 -- 插入默认新闻分类
 -- 注意：分类/用户使用 INSERT IGNORE，已存在时自动跳过；
--- news 表无唯一键约束，重复执行本脚本会重复追加新闻数据，请勿对已有数据的库重复导入
+-- news 表有 (title, category_id) 唯一索引，重复执行本脚本时已导入的新闻会自动跳过
 INSERT IGNORE INTO `news_category` (`name`, `sort_order`) VALUES 
 ('头条', 1),
 ('社会', 2),

@@ -23,7 +23,9 @@ class News(Base, TimestampMixin):
     # 创建索引：提升查询速度 → 添加目录
     __table_args__ = (
         Index('fk_news_category_idx', 'category_id'),  # 高频查询场景
-        Index('idx_publish_time', 'publish_time')  # 按发布时间排序
+        Index('idx_publish_time', 'publish_time'),  # 按发布时间排序
+        # 同分类下标题唯一：RSS 抓取与重复导入去重的兜底约束
+        Index('title_category_UNIQUE', 'title', 'category_id', unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True, comment="新闻ID")
