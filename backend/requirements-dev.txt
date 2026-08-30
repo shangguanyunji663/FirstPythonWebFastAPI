@@ -1,0 +1,5 @@
+# 测试专用依赖：pip install -r requirements-dev.txt
+pytest==9.1.1
+pytest-asyncio==1.4.0
+aiosqlite==0.22.1
+fakeredis==2.37.1
