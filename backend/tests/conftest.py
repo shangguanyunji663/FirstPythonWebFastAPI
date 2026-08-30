@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
 import config.cache_conf
-import crud.news_cache
+import crud.news
 from config.db_conf import get_db
 from main import app  # noqa: F401  导入即注册全部模型到 Base.metadata
 from models.base import Base
@@ -51,7 +51,7 @@ async def patched_environment(session_factory, fake_redis, monkeypatch):
     """每个测试自动执行：缓存层/后台任务的 Redis 与会话工厂全部指向测试环境，
     限流器（进程级全局状态）在测试间清空"""
     monkeypatch.setattr(config.cache_conf, "redis_client", fake_redis)
-    monkeypatch.setattr(crud.news_cache, "AsyncSessionLocal", session_factory)
+    monkeypatch.setattr(crud.news, "AsyncSessionLocal", session_factory)
     rate_limit._attempts.clear()
     yield
 

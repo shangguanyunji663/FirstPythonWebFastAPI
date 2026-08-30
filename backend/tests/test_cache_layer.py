@@ -41,14 +41,14 @@ def test_ttl_jitter_bounds():
 
 
 async def test_delete_cache_pattern_only_matches_prefix(fake_redis):
-    await fake_redis.set("news_list:1:1:10", "a")
-    await fake_redis.set("news_list:1:2:10", "b")
-    await fake_redis.set("news_list:2:1:10", "c")
+    await fake_redis.set("news:list:1:1:10", "a")
+    await fake_redis.set("news:list:1:2:10", "b")
+    await fake_redis.set("news:list:2:1:10", "c")
     await fake_redis.set("news:detail:1", "d")
 
-    deleted = await delete_cache_pattern("news_list:1:*")
+    deleted = await delete_cache_pattern("news:list:1:*")
     assert deleted == 2
-    assert await fake_redis.get("news_list:2:1:10") == "c"
+    assert await fake_redis.get("news:list:2:1:10") == "c"
     assert await fake_redis.get("news:detail:1") == "d"
 
 

@@ -94,9 +94,9 @@ async def test_empty_category_list_not_leak_marker(client, seed_news, fake_redis
 
 async def test_categories_cached_empty_marker_not_leaked(client, seed_news, fake_redis):
     """回归：分类缓存里是占位 marker 时，接口应返回空列表而不是 marker 本身"""
-    from cache.news_cache import CATEGORIES_KEY
+    from cache.news_cache import _categories_key
 
-    await fake_redis.set(CATEGORIES_KEY, '[{"__empty__": true}]')
+    await fake_redis.set(_categories_key(0, 100), '[{"__empty__": true}]')
     response = await client.get(CATEGORIES_PATH)
     assert response.status_code == 200
     assert response.json()["data"] == []

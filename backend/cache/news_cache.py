@@ -10,8 +10,8 @@ from config.cache_conf import (
     set_cache,
 )
 
-CATEGORIES_KEY = "news:categories"
-NEWS_LIST_PREFIX = "news_list:"
+CATEGORIES_PREFIX = "news:categories:"
+NEWS_LIST_PREFIX = "news:list:"
 NEWS_DETAIL_PREFIX = "news:detail:"
 RELATED_NEWS_PREFIX = "news:related:"
 NEWS_COUNT_PREFIX = "news:count:"
@@ -35,23 +35,29 @@ def _with_jitter(expire: int) -> int:
     return int(expire * random.uniform(0.9, 1.1))
 
 
-# ---------- 新闻分类 ----------
-async def get_cached_categories():
-    data = await get_json_cache(CATEGORIES_KEY)
+# ---------- 新闻分类 key = news:categories:skip:limit ----------
+def _categories_key(skip: int, limit: int) -> str:
+    # 分页参数编入键：同一接口不同 skip/limit 的结果互不串页
+    return f"{CATEGORIES_PREFIX}{skip}:{limit}"
+
+
+async def get_cached_categories(skip: int = 0, limit: int = 100):
+    data = await get_json_cache(_categories_key(skip, limit))
     if _detect_empty(data):
         return EMPTY
     return data
 
 
-async def set_cache_categories(data: list[dict[str, Any]], expire: int = 7200):
+async def set_cache_categories(data: list[dict[str, Any]], skip: int = 0, limit: int = 100,
+                               expire: int = 7200):
     # 数据越稳定缓存越久：分类 7200；列表 1800；详情 300
     if not data:
         data = [EMPTY_MARKER]
         expire = EMPTY_TTL
-    return await set_cache(CATEGORIES_KEY, data, _with_jitter(expire))
+    return await set_cache(_categories_key(skip, limit), data, _with_jitter(expire))
 
 
-# ---------- 新闻列表 key = news_list:分类id:页码:每页数量 ----------
+# ---------- 新闻列表 key = news:list:分类id:页码:每页数量 ----------
 def _list_key(category_id: int | None, page: int, size: int) -> str:
     category_part = category_id if category_id is not None else "all"
     return f"{NEWS_LIST_PREFIX}{category_part}:{page}:{size}"
@@ -90,12 +96,19 @@ async def cache_news_detail(news_id: int, news_data: dict[str, Any], expire: int
 # ---------- 相关新闻 ----------
 async def cache_related_news(news_id: int, category_id: int,
                              related_list: list[dict[str, Any]], expire: int = 1800) -> bool:
+    if not related_list:
+        # 空结果也缓存（短 TTL）：单新闻分类避免每次详情都穿透查库
+        related_list = [EMPTY_MARKER]
+        expire = EMPTY_TTL
     return await set_cache(f"{RELATED_NEWS_PREFIX}{news_id}:{category_id}",
                            related_list, _with_jitter(expire))
 
 
-async def get_cached_related_news(news_id: int, category_id: int) -> list[dict[str, Any]] | None:
-    return await get_json_cache(f"{RELATED_NEWS_PREFIX}{news_id}:{category_id}")
+async def get_cached_related_news(news_id: int, category_id: int):
+    data = await get_json_cache(f"{RELATED_NEWS_PREFIX}{news_id}:{category_id}")
+    if _detect_empty(data):
+        return EMPTY
+    return data
 
 
 # ---------- 分类新闻总数（列表分页用，避免每次请求都 count(*)） ----------

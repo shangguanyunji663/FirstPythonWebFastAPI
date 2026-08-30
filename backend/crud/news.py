@@ -1,4 +1,5 @@
-from fastapi.encoders import jsonable_encoder
+import logging
+
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,12 +20,14 @@ from cache.news_cache import (
 from config.db_conf import AsyncSessionLocal
 from models.news import Category, News
 from schemas.base import NewsItemBase
-from schemas.news import NewsDetailResponse, RelatedNewsResponse
+from schemas.news import CategoryResponse, NewsDetailResponse, RelatedNewsResponse
+
+logger = logging.getLogger("app.news")
 
 
 async def get_categories(db: AsyncSession, skip: int = 0, limit: int = 100):
     # 先尝试从缓存中获取数据（EMPTY 表示缓存过“空分类”，直接返回空列表防穿透）
-    cached_categories = await get_cached_categories()
+    cached_categories = await get_cached_categories(skip, limit)
     if cached_categories is EMPTY:
         return []
     if cached_categories:
@@ -35,9 +38,10 @@ async def get_categories(db: AsyncSession, skip: int = 0, limit: int = 100):
     categories = result.scalars().all()  # ORM
 
     # 写入缓存（空结果也会写短 TTL 占位防穿透，见 cache 层）
+    # mode="json" 把 datetime 转 ISO 字符串，方便 json.dumps 落 Redis
     if categories:
-        categories = jsonable_encoder(categories)
-    await set_cache_categories(categories)
+        categories = [CategoryResponse.model_validate(c).model_dump(mode="json") for c in categories]
+    await set_cache_categories(categories, skip, limit)
 
     # 返回数据
     return categories
@@ -129,10 +133,14 @@ async def increase_news_views_in_background(news_id: int) -> None:
             await increase_news_views(db, news_id)
         except Exception:
             await db.rollback()
+            # 后台任务没有调用方接收异常，必须记日志，否则自增持续失败会完全不可见
+            logger.exception("后台浏览量自增失败 news_id=%s", news_id)
 
 
 async def get_related_news(db: AsyncSession, news_id: int, category_id: int, limit: int = 5):
     cached_related = await get_cached_related_news(news_id, category_id)
+    if cached_related is EMPTY:
+        return []
     if cached_related:
         # 缓存数据是字典列表，直接返回
         return cached_related
@@ -145,7 +153,6 @@ async def get_related_news(db: AsyncSession, news_id: int, category_id: int, lim
         News.publish_time.desc()
     ).limit(limit)
     result = await db.execute(stmt)
-    # return result.scalars().all()
     related_news = result.scalars().all()
 
     # 转换为字典格式用于缓存和返回（不使用别名，保持数据库字段名）
@@ -157,16 +164,6 @@ async def get_related_news(db: AsyncSession, news_id: int, category_id: int, lim
         await cache_related_news(news_id, category_id, related_data)
         return related_data
 
-    # 没有相关新闻，返回空列表
+    # 没有相关新闻：空结果也写短 TTL 占位（cache 层处理），防止反复穿透查库
+    await cache_related_news(news_id, category_id, [])
     return []
-    # 列表推导式 推导出新闻的核心数据，然后再 return
-    # return [{
-    #     "id": news_detail.id,
-    #     "title": news_detail.title,
-    #     "content": news_detail.content,
-    #     "image": news_detail.image,
-    #     "author": news_detail.author,
-    #     "publishTime": news_detail.publish_time,
-    #     "categoryId": news_detail.category_id,
-    #     "views": news_detail.views
-    # } for news_detail in related_news]
