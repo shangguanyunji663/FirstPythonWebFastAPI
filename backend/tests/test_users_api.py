@@ -6,7 +6,7 @@ from sqlalchemy import select
 from models.users import User, UserToken
 from tests.conftest import LOGIN_PATH, auth_headers, register_user
 from utils import security
-from utils.rate_limit import _attempts
+from utils.rate_limit import _MAX_KEYS, _attempts, check_login_rate_limit
 
 USER_INFO_PATH = "/api/user/info"
 USER_UPDATE_PATH = "/api/user/update"
@@ -166,3 +166,11 @@ async def test_login_rate_limit(client):
     assert sixth.status_code == 429
     assert sixth.json()["message"] == "登录尝试过于频繁，请稍后再试"
     assert "rateuser" in _attempts  # 触发限流后记录仍在
+
+
+async def test_rate_limit_bounded_memory():
+    """随机用户名撞库时限流表有键数上限，不会无限增长"""
+    for i in range(_MAX_KEYS + 200):
+        check_login_rate_limit(f"attacker-{i}")
+    # 超上限触发清理（全为新记录时兜底重置），键数不会持续膨胀
+    assert len(_attempts) <= _MAX_KEYS
