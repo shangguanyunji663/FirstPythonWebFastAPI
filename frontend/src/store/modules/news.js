@@ -14,9 +14,9 @@ export const useNewsStore = defineStore('news', {
   }),
 
   actions: {
-    // 获取新闻分类
+    // 获取新闻分类：失败不造假数据，categories 置空由页面显示重试空态
     async getCategories() {
-      if (this.categoriesLoading) return;
+      if (this.categoriesLoading) return { success: false, message: '分类加载中' };
 
       this.categoriesLoading = true;
 
@@ -25,26 +25,19 @@ export const useNewsStore = defineStore('news', {
         const response = await request.get('/api/news/categories');
 
         if (response.data && response.data.code === 200) {
-          // 设置分类数据
-          this.categories = [...response.data.data, { id: 10, name: '更多' }];
+          this.categories = response.data.data;
 
           // 如果没有设置当前分类，则设置为第一个分类
           if (!this.currentCategory && this.categories.length > 0) {
             this.currentCategory = this.categories[0].id;
           }
+          return { success: true };
         }
+        return { success: false, message: response.data?.message || '获取新闻分类失败' };
       } catch (error) {
         console.error('获取新闻分类失败:', error);
-        // 设置默认分类，以防API请求失败
-        this.categories = [
-          { id: 1, name: '头条' },
-          { id: 2, name: '社会' },
-          { id: 3, name: '国内' },
-          { id: 4, name: '国际' },
-          { id: 5, name: '娱乐' },
-          { id: 6, name: '体育' },
-          { id: 7, name: '科技' }
-        ];
+        this.categories = [];
+        return { success: false, message: '网络请求失败' };
       } finally {
         this.categoriesLoading = false;
       }

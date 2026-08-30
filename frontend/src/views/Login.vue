@@ -49,12 +49,13 @@
 
 <script setup>
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { showToast } from 'vant';
 import { useUserStore } from '../store/user';
 import { useI18n } from 'vue-i18n';
 
 const router = useRouter();
+const route = useRoute();
 const userStore = useUserStore();
 const { t } = useI18n();
 
@@ -82,8 +83,10 @@ const onSubmit = async (_values) => {
         type: 'success',
         message: result.message
       });
-      
-      router.push('/');
+
+      // 401 被登出后跳转登录会带 redirect 参数；只接受站内绝对路径，防开放重定向
+      const redirect = route.query.redirect;
+      router.push(typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/');
     } else {
       showToast({
         type: 'fail',

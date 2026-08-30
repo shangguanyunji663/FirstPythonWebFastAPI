@@ -13,7 +13,10 @@ export default {
     register: '注册',
     logout: '退出登录',
     allCategories: '全部分类',
-    tip: '提示'
+    tip: '提示',
+    loginExpired: '登录已过期，请重新登录',
+    loadFailed: '加载失败',
+    retry: '重试'
   },
   nav: {
     home: '首页',
@@ -43,6 +46,7 @@ export default {
     title: 'AI问答',
     placeholder: '请输入您的问题...',
     send: '发送',
+    stop: '停止',
     thinking: 'AI思考中...',
     welcome: '你好！我是AI助手，有什么可以帮助你的吗？',
     loginRequired: '请先登录后再使用AI助手',

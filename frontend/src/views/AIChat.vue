@@ -30,13 +30,13 @@
           class="chat-input"
           @keypress.enter.prevent="sendMessage"
         />
-        <van-button 
-          type="primary" 
-          class="send-button" 
-          :disabled="isLoading || !userInput.trim()" 
-          @click="sendMessage"
+        <van-button
+          type="primary"
+          class="send-button"
+          :disabled="!isLoading && !userInput.trim()"
+          @click="isLoading ? stopGeneration() : sendMessage()"
         >
-          {{ $t('aiChat.send') }}
+          {{ isLoading ? $t('aiChat.stop') : $t('aiChat.send') }}
         </van-button>
       </div>
     </div>
@@ -46,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick, watch } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import TabBar from '../components/TabBar.vue';
 import { showToast } from 'vant';
 import * as marked from 'marked';
@@ -64,6 +64,13 @@ const messages = ref([
 const userInput = ref('');
 const messagesContainer = ref(null);
 const isLoading = ref(false);
+// 当前流式请求的中止控制器：停止按钮与组件卸载共用
+let abortController = null;
+
+// 停止生成：中止 SSE 流，保留已输出的部分内容
+const stopGeneration = () => {
+  abortController?.abort();
+};
 
 const userStore = useUserStore();
 
@@ -101,10 +108,19 @@ const sendMessage = async () => {
   try {
     await fetchAIResponse(userMessage);
   } catch (error) {
-    console.error('Error fetching AI response:', error);
-    // 更新最后一条消息为错误信息
-    messages.value[messages.value.length - 1].content = t('aiChat.errorOccurred', { message: error.message || t('aiChat.networkError') });
+    if (error?.name === 'AbortError') {
+      // 手动停止：占位消息还没有内容时直接移除，已有部分内容则保留
+      const last = messages.value[messages.value.length - 1];
+      if (last && last.role === 'assistant' && last.content === '') {
+        messages.value.pop();
+      }
+    } else {
+      console.error('Error fetching AI response:', error);
+      // 更新最后一条消息为错误信息
+      messages.value[messages.value.length - 1].content = t('aiChat.errorOccurred', { message: error.message || t('aiChat.networkError') });
+    }
   } finally {
+    abortController = null;
     isLoading.value = false;
     await nextTick();
     scrollToBottom();
@@ -118,13 +134,15 @@ const fetchAIResponse = async (userMessage) => {
     .slice(0, -2)
     .map(msg => ({ role: msg.role, content: msg.content }));
 
+  abortController = new AbortController();
   const response = await fetch(`${apiConfig.baseURL}${aiConfig.chatEndpoint}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${userStore.token}`
     },
-    body: JSON.stringify({ message: userMessage, history })
+    body: JSON.stringify({ message: userMessage, history }),
+    signal: abortController.signal
   });
 
   if (!response.ok) {
@@ -196,6 +214,11 @@ watch(messages, () => {
 // 组件挂载时滚动到底部
 onMounted(() => {
   scrollToBottom();
+});
+
+// 离开页面（非 keepAlive 场景，如刷新/关闭）时中止进行中的流，不再白白消耗上游 token
+onBeforeUnmount(() => {
+  stopGeneration();
 });
 </script>
 

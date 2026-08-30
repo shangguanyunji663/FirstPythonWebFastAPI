@@ -12,7 +12,7 @@
     <div class="category-tabs">
       <van-tabs v-model:active="activeTab" sticky swipeable animated>
         <van-tab
-          v-for="category in displayCategories"
+          v-for="category in newsStore.categories"
           :key="category.id"
           :title="getCategoryTranslation(category.name)"
         >
@@ -23,23 +23,32 @@
               :finished-text="$t('home.noMore')"
               @load="onLoad"
             >
-              <news-item 
-                v-for="item in newsStore.newsList" 
-                :key="item.id" 
-                :news="item" 
+              <news-item
+                v-for="item in newsStore.newsList"
+                :key="item.id"
+                :news="item"
               />
             </van-list>
           </van-pull-refresh>
         </van-tab>
       </van-tabs>
     </div>
-    
+
+    <van-empty
+      v-if="!newsStore.categories.length && !newsStore.categoriesLoading"
+      :description="$t('common.loadFailed')"
+    >
+      <van-button round type="primary" class="retry-button" @click="loadCategories">
+        {{ $t('common.retry') }}
+      </van-button>
+    </van-empty>
+
     <tab-bar />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { useNewsStore } from '../store/modules/news'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -60,10 +69,8 @@ watch(
   (newCategoryId) => {
     if (newCategoryId) {
       const categoryId = parseInt(newCategoryId)
-      // 找到分类ID对应的索引
-      const filteredCategories = newsStore.categories.filter(category => category.name !== '更多')
-      const index = filteredCategories.findIndex(cat => cat.id === categoryId)
-      
+      const index = newsStore.categories.findIndex(cat => cat.id === categoryId)
+
       if (index !== -1) {
         // 设置activeTab为对应索引
         activeTab.value = index
@@ -75,24 +82,23 @@ watch(
   { immediate: true }
 )
 
-onMounted(() => {
-  // 获取新闻分类
-  newsStore.getCategories().then(() => {
-    // 获取新闻列表
-    newsStore.getNewsList()
+// 加载分类，成功后再拉取列表；失败时页面显示重试空态
+const loadCategories = () => {
+  newsStore.getCategories().then((result) => {
+    if (result?.success) {
+      newsStore.getNewsList(true)
+    }
   })
-  
+}
+
+onMounted(() => {
+  loadCategories()
+
   // 初始化位置
   setTimeout(updateTabsPosition, 300)
-  
+
   // 添加滚动事件监听
   window.addEventListener('scroll', handleScroll)
-})
-
-// 计算属性：显示的分类（只显示非"更多"分类）
-const displayCategories = computed(() => {
-  // 获取所有非"更多"分类
-  return newsStore.categories.filter(category => category.name !== '更多');
 })
 
 // 获取分类名称的翻译（映射统一在 constants/categories.js 维护）
@@ -153,6 +159,11 @@ const onLoad = () => {
 .category-tabs {
   margin-bottom: 10px;
   position: relative;
+}
+
+.retry-button {
+  margin-top: 12px;
+  padding: 0 40px;
 }
 
 :deep(.van-tabs__wrap) {

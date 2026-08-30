@@ -9,15 +9,24 @@
     />
     
     <div class="category-container">
-      <van-grid :column-num="3" :border="false">
-        <van-grid-item 
-          v-for="category in displayCategories" 
+      <van-grid v-if="newsStore.categories.length" :column-num="3" :border="false">
+        <van-grid-item
+          v-for="category in newsStore.categories"
           :key="category.id"
           :text="getCategoryTranslation(category.name)"
           icon="newspaper-o"
           @click="goToCategoryNews(category.id)"
         />
       </van-grid>
+
+      <van-empty
+        v-else-if="!newsStore.categoriesLoading"
+        :description="$t('common.loadFailed')"
+      >
+        <van-button round type="primary" class="retry-button" @click="loadCategories">
+          {{ $t('common.retry') }}
+        </van-button>
+      </van-empty>
     </div>
     
     <tab-bar />
@@ -29,16 +38,23 @@ import { useNewsStore } from '../store/modules/news'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import TabBar from '../components/TabBar.vue'
-import { computed } from 'vue'
+import { onMounted } from 'vue'
 import { CATEGORY_NAME_KEY_MAP } from '../constants/categories'
 
 const newsStore = useNewsStore()
 const router = useRouter()
 const { t } = useI18n()
 
-// 计算属性：显示的分类（只显示非"更多"分类）
-const displayCategories = computed(() => {
-  return newsStore.categories.filter(category => category.name !== '更多');
+// 加载分类（进入本页时 store 可能还没有数据）
+const loadCategories = () => {
+  newsStore.getCategories()
+}
+
+// 直接进入本页（如刷新落在 /category）时自动拉取
+onMounted(() => {
+  if (!newsStore.categories.length) {
+    loadCategories()
+  }
 })
 
 // 返回上一页
@@ -95,5 +111,10 @@ const getCategoryTranslation = (categoryName) => {
   margin-top: 8px;
   color: #333;
   font-size: 14px;
+}
+
+.retry-button {
+  margin-top: 12px;
+  padding: 0 40px;
 }
 </style>

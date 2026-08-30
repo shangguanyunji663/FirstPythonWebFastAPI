@@ -13,7 +13,10 @@ export default {
     register: 'Register',
     logout: 'Logout',
     allCategories: 'All Categories',
-    tip: 'Notice'
+    tip: 'Notice',
+    loginExpired: 'Session expired, please log in again',
+    loadFailed: 'Load failed',
+    retry: 'Retry'
   },
   nav: {
     home: 'Home',
@@ -43,6 +46,7 @@ export default {
     title: 'AI Chat',
     placeholder: 'Enter your question...',
     send: 'Send',
+    stop: 'Stop',
     thinking: 'AI is thinking...',
     welcome: 'Hello! I am your AI assistant. How can I help you?',
     loginRequired: 'Please log in before using the AI assistant',
