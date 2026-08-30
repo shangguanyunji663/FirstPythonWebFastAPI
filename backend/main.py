@@ -45,7 +45,9 @@ async def lifespan(app):
         scheduler.start()
         crawler_logger.info("定时抓取已启动，间隔 %s 小时", CRAWL_INTERVAL_HOURS)
     yield
-    scheduler.shutdown(wait=False)
+    # CRAWLER_ENABLED=false 时调度器从未启动，直接 shutdown 会抛 SchedulerNotRunningError
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(lifespan=lifespan)

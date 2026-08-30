@@ -24,9 +24,11 @@ HISTORY_LIMIT = 10
 
 def _build_payload(messages):
     payload = {"model": AI_MODEL, "messages": messages, "stream": True}
-    # 关闭深度思考，答案直接流式输出（仅智谱 GLM 系列识别该参数）
+    # 关闭深度思考，答案直接流式输出（智谱 GLM 系列与 Ollama 的 Qwen 系列参数名不同）
     if AI_PROVIDER == "zhipu":
         payload["thinking"] = {"type": "disabled"}
+    elif AI_PROVIDER == "ollama":
+        payload["reasoning_effort"] = "none"
     return payload
 
 

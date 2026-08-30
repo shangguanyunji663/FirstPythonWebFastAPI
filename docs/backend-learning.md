@@ -38,16 +38,20 @@
 
 ## 1. 项目是什么：一个新闻系统的后端
 
-这是一个仿"今日头条"的新闻系统，**本仓库的主角是它的后端 API 服务**。它对外提供 17 个 HTTP 接口，分为 4 组：
+这是一个仿"今日头条"的新闻系统，**本仓库的主角是它的后端 API 服务**。它对外提供 20 个 HTTP 接口，分为 6 组：
 
 | 模块 | 功能 | 接口数 |
 |------|------|--------|
 | 用户 | 注册、登录、查信息、改资料、改密码 | 5 |
-| 新闻 | 分类列表、新闻列表（分页）、新闻详情（浏览量+1） | 3 |
+| 新闻 | 分类列表、新闻列表（分页）、新闻详情（浏览量后台+1） | 3 |
 | 收藏 | 检查/添加/取消/列表/清空 | 5 |
 | 历史 | 添加/列表/删除单条/清空 | 4 |
+| AI 问答 | SSE 流式对话（后端代理智谱/本地 Ollama）、聊天历史 | 2 |
+| 数据采集 | RSS 爬虫手动触发（定时抓取随应用启动自动注册） | 1 |
 
-完整的接口定义（路径、参数、响应示例）在 `docs/api-spec.md`，这里是你的"验收标准"——你复现的每个接口都应与它一致。
+本教程的复现路线覆盖前 4 组共 17 个核心接口；AI 问答与爬虫不单独成章，读完本教程后可直接读 `routers/ai.py`（约 100 行）和 `crawler/`（约 200 行），用到的全是前面章节的概念。
+
+完整的接口定义（路径、参数、响应示例）在 `api-spec.md`，这里是你的"验收标准"——你复现的每个接口都应与它一致。
 
 **一句话概括架构**：浏览器里的 Vue 前端发 HTTP 请求 → FastAPI 接住请求 → 经过校验和认证 → 通过 SQLAlchemy 查 MySQL（能命中 Redis 缓存就不查库）→ 把结果包成统一格式的 JSON 返回。
 
@@ -67,6 +71,9 @@
 | **aiomysql** | MySQL 的**异步**驱动，SQLAlchemy 通过它发请求 | —— |
 | **redis** | 内存键值数据库，本项目用作**缓存**（高频数据先问 Redis，没有再查 MySQL） | 每个请求都打数据库，量大就拖垮 |
 | **passlib + bcrypt** | 密码哈希：存"不可逆的指纹"而不是明文密码 | 数据库泄露=全部明文密码泄露 |
+| **httpx** | 异步 HTTP 客户端：AI 代理转发模型服务、爬虫抓取 RSS 源都用它 | 自己造轮子发 HTTP 请求 |
+| **APScheduler** | 定时任务调度：应用启动后按固定间隔触发 RSS 抓取 | 自己写 `while True: sleep()` 循环 |
+| **feedparser + selectolax** | RSS/XML 解析与 HTML 转纯文本：把抓来的源变成新闻行 | 手写 XML/HTML 字符串解析 |
 | **python-dotenv** | 从 `.env` 文件读配置（数据库密码等），避免写死在代码里 | 密码提交进代码仓库 |
 
 **两个零基础必须先建立的观念**：
@@ -89,7 +96,7 @@ conda env create -f environment.yml -p .conda-env
 cp .env.example .env        # Windows Git Bash 用 cp；PowerShell 用 copy
 
 # 3. 初始化数据库（建 news_app 库 + 8 张表 + 示例数据）
-mysql -uroot -p < ../database/database.sql
+mysql -uroot -p --default-character-set=utf8mb4 < ../database/database.sql
 
 # 4. 启动
 conda activate ./.conda-env
@@ -97,6 +104,8 @@ uvicorn main:app --reload
 ```
 
 打开 `http://127.0.0.1:8000/docs`——这是 FastAPI **自动生成**的交互式接口文档，所有接口可以直接在网页上填参数调试。**它是你复现过程中最重要的自测工具**。
+
+> 应用启动时会自动注册 RSS 定时抓取：启动即抓一次，之后每 6 小时一轮。开发环境反复热重载觉得吵的话，在 `.env` 里设 `CRAWLER_ENABLED=false` 再启动。
 
 `.env` 里每个变量改了会发生什么，见第 7 章。
 
@@ -163,11 +172,12 @@ backend/
 ├── crud/            # 数据访问层：所有数据库读写（只管"数据怎么来"）
 ├── models/          # 模型层：数据库表在 Python 里的映射（只管"表长什么样"）
 ├── cache/           # 缓存键与读写封装（只管"Redis 怎么用"）
+├── crawler/         # RSS 爬虫：抓取公开源 → 解析 → 去重入库 → 失效分类缓存
 ├── config/          # 配置：数据库/Redis 连接（只管"连到哪"）
 └── utils/           # 横切工具：认证、密码哈希、限流、异常处理
 ```
 
-**依赖方向必须是单向的**：`routers → crud → models`。反向依赖（crud 里 import routers）是架构坏味道——本项目唯一一处反例是 `crud/users.py:90` 抛了 Web 层的 `HTTPException`，属于历史遗留（见第 21 章）。
+**依赖方向必须是单向的**：`routers → crud → models`。反向依赖（crud 里 import routers）是架构坏味道——本项目唯一一处反例是 `crud/users.py:97` 抛了 Web 层的 `HTTPException`，属于历史遗留（见第 21 章）。
 
 **一次"GET /api/news/list?categoryId=1&page=1"的完整旅程**（记住这条线，后面每章都是线上的一站）：
 
@@ -208,6 +218,15 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=
 CORS_ORIGINS=
+
+# ---- AI 问答（提供方与密钥统一在后端，前端零密钥） ----
+AI_PROVIDER=zhipu              # zhipu（智谱云端）| ollama（本地）
+AI_API_KEY=                    # 智谱 API Key；provider=ollama 时无需
+AI_MODEL=glm-4.7-flash
+OLLAMA_BASE_URL=http://localhost:11434
+
+# ---- RSS 爬虫 ----
+CRAWLER_ENABLED=true           # false 关闭定时抓取（开发热重载时用）
 ```
 
 `config/db_conf.py` 读取并创建**异步引擎**：
@@ -308,20 +327,24 @@ created_at = mapped_column(DateTime, default=datetime.now)     # ✅ 不带括�
 
 带括号 = **在定义类的那个时刻**求值一次，之后所有插入都用这同一个固定时间；不带括号 = 传入函数本身，每次插入时才调用。这个 bug 曾导致本项目所有用户的创建时间是同一个值。
 
-**复现要点**：写 `models/base.py` → `users.py`（User + UserToken）→ `news.py`（Category + News，继承 TimestampMixin）→ `favorite.py`、`history.py`。验证：`python -c "from models import users, news, favorite, history; print('ok')"`。本项目表结构由 `database/database.sql` 管理，模型只做映射不做建表，所以不需要跑 `create_all`。
+**复现要点**：写 `models/base.py` → `users.py`（User + UserToken）→ `news.py`（Category + News，继承 TimestampMixin）→ `related_news.py`、`favorite.py`、`history.py`、`ai.py`。验证：`python -c "from models import users, news, related_news, favorite, history, ai; print('ok')"`。本项目表结构由 `database/database.sql` 管理，模型只做映射不做建表，所以不需要跑 `create_all`。
 
 ---
 
 ## 9. 校验层：schemas/
 
-**概念**：Pydantic 模型 = "带声明的数据形状"。请求进来，FastAPI 自动按它解析+校验 JSON；不符合就返回 422，**你的业务代码一行校验都不用写**。
+**概念**：Pydantic 模型 = "带声明的数据形状"。请求进来，FastAPI 自动按它解析+校验 JSON；不符合就自动报错（本项目通过全局处理器统一转成 **400 + 字段级错误明细**，见第 16 章），**你的业务代码一行校验都不用写**。
 
 以 `schemas/users.py` 为例，看四件事：
 
 ```python
-class UserRequest(BaseModel):          # 注册/登录的入参
-    username: str
-    password: str
+class UserRequest(BaseModel):          # 注册入参：强校验（与 user 表列定义对齐）
+    username: str = Field(..., min_length=4, max_length=20, pattern=r"^[a-zA-Z0-9_]+$")
+    password: str = Field(..., min_length=6, max_length=32)
+
+class UserLoginRequest(BaseModel):     # 登录入参：仅要求非空，宽松规则避免历史账号被新规则锁在门外
+    username: str = Field(..., min_length=1, max_length=50)
+    password: str = Field(..., min_length=1, max_length=64)
 
 class UserAuthResponse(BaseModel):     # 登录成功的响应体
     token: str
@@ -330,7 +353,7 @@ class UserAuthResponse(BaseModel):     # 登录成功的响应体
 
 class UserChangePasswordRequest(BaseModel):
     old_password: str = Field(..., alias="oldPassword")
-    new_password: str = Field(..., min_length=6, alias="newPassword")   # 内置校验：少于6位直接422
+    new_password: str = Field(..., min_length=6, alias="newPassword")   # 内置校验：少于6位直接400
 ```
 
 - **为什么 models 和 schemas 要分开**：`User` ORM 对象里有密码哈希、created_at 等不该出现在接口响应里的字段；而接口入参（注册）只需要 username/password 两个字段。两边形状不同、变化原因不同——强行共用一个类，早晚泄露字段。
@@ -467,13 +490,14 @@ class APIResponse(BaseModel, Generic[T]):
     token = str(uuid.uuid4())                       # 生成随机令牌
     expires_at = datetime.now() + timedelta(days=7) # 有效期7天
     查 user_token 表：该用户已有 token → 更新值和过期时间；没有 → 插入新行
+    库里只存 SHA-256 摘要（security.hash_token(token)），原始 token 仅在本次响应中返回一次
     返回 token 给前端
 
 之后每个受保护请求 → utils/auth.py:get_current_user（它也是一个依赖）：
     authorization: str = Header(..., alias="Authorization")   # 从请求头取
     token = authorization[7:].strip() if authorization.startswith("Bearer ") else authorization.strip()
     → crud.get_user_by_token(db, token)：
-        查 user_token 表 → 没查到或 expires_at < now → None
+        对原始 token 做同样的 SHA-256 摘要后查 user_token 表 → 没查到或 expires_at < now → None
         → 再查 user 表拿用户对象
     → 拿不到用户 → 抛 401 "无效的令牌或已经过期的令牌"
 ```
@@ -484,12 +508,13 @@ class APIResponse(BaseModel, Generic[T]):
 async def get_user_info(user: User = Depends(get_current_user)):
 ```
 
-依赖还能嵌套：`get_current_user` 自己又 `Depends(get_db)`。FastAPI 会先解 db，再解 auth，整条链自动组装。**这就是"依赖注入"的最大价值**：认证逻辑写一次，17 个接口按需挂载。
+依赖还能嵌套：`get_current_user` 自己又 `Depends(get_db)`。FastAPI 会先解 db，再解 auth，整条链自动组装。**这就是"依赖注入"的最大价值**：认证逻辑写一次，20 个接口按需挂载。
 
-两个实战细节：
+三个实战细节：
 
 1. `Bearer ` 前缀解析用 `startswith` 严格判断，不要用 `replace("Bearer ", "")`——后者会把 token 中间出现的 "Bearer " 也删掉（本项目真实修过的 bug）。
-2. 令牌方案的取舍：每请求 2 次查库（token→user）在本项目规模可接受；换 JWT 的思路和前置条件见第 21 章。
+2. 库里只存令牌的 SHA-256 摘要而不是原文：数据库泄露（比如备份文件外流）也拿不到可直接使用的会话凭证；比对时对请求头里的原始 token 做同样的摘要再查库即可。代价是无法从库里反查某个原始 token 属于谁——对教学项目是划算的取舍。
+3. 令牌方案的取舍：每请求 2 次查库（token→user）在本项目规模可接受；换 JWT 的思路和前置条件见第 21 章。
 
 **复现要点**：`create_token` + `get_user_by_token` + `get_current_user`，然后给 `/api/user/info` 加依赖，用 `/docs` 的 Authorize 按钮先试错误 token（401）、再试登录返回的真 token（200）。
 
@@ -546,7 +571,9 @@ return result.rowcount > 0
 
 `News.views + 1` 生成的是 SQL 表达式 `views = views + 1`，**并发下也不会丢计数**（对比"读出来+1再写回"的丢更新问题）。
 
-**复现要点**：models/news.py → crud 的五个查询函数（先不管缓存，直接查库）→ routers/news.py 三个接口（列表、详情、分类）。`/docs` 里验证分页参数 `page=0` 返回 422 而不是 500。
+路由层（`routers/news.py`）不直接调用它，而是挂到 `BackgroundTasks` 上——浏览量在**响应发出之后**才后台 +1，接口秒回，且响应里的 `views` 是本次浏览前的值。注意后台任务执行时请求级会话已关闭，函数内部要自建 `AsyncSessionLocal` 会话。
+
+**复现要点**：models/news.py → crud 的五个查询函数（先不管缓存，直接查库）→ routers/news.py 三个接口（列表、详情、分类）。`/docs` 里验证分页参数 `page=0` 返回 400（`data` 为字段级错误明细）而不是 500。
 
 ---
 
@@ -584,9 +611,10 @@ return result.rowcount > 0
 
 **概念**：业务代码里到处 `try/except` 会淹没主逻辑。FastAPI 支持**全局异常处理器**：某类异常抛出到顶层，统一由一个函数转成响应。
 
-`utils/exception_handlers.py` 注册了 4 个，**从具体到抽象**：
+`utils/exception_handlers.py` 注册了 5 个，**从具体到抽象**：
 
 ```python
+app.add_exception_handler(RequestValidationError, request_validation_error_handler)  # 参数校验：统一转 400 + 字段明细
 app.add_exception_handler(HTTPException, http_exception_handler)      # 业务主动抛的
 app.add_exception_handler(IntegrityError, integrity_error_handler)    # 数据库唯一约束/外键
 app.add_exception_handler(SQLAlchemyError, sqlalchemy_error_handler)  # 其他数据库错误
@@ -604,6 +632,8 @@ CONSTRAINT_MESSAGES = {
 }
 detail = next((msg for name, msg in CONSTRAINT_MESSAGES.items() if name in error_msg), None)
 ```
+
+不同数据库的报错文本格式不同（MySQL 带约束名，SQLite 只报列名），所以查找顺序是**先按约束名精确匹配、再按列名兜底**。参数校验同理：`RequestValidationError` 不走 FastAPI 默认的 422，而是统一转成 400，`data` 里带 `[{field, message}]` 字段级明细，`message` 由 `VALIDATION_MESSAGE_MAP` 把 Pydantic 错误类型翻译成人话（如 `string_too_short` → `长度不足`）。
 
 本项目曾把所有 Duplicate entry 一律报"用户名已存在"——收藏重复时用户看到的就是驴唇不对马嘴的提示。**错误消息是产品的一部分**。
 
@@ -656,7 +686,7 @@ rows = result.all()          # [(News对象, 收藏时间, 收藏id), ...] 一�
 
 ## 18. 组装：main.py（路由、CORS、日志）
 
-所有零件齐了，`main.py` 负责总装——它只有 50 行，但三件事都有讲究：
+所有零件齐了，`main.py` 负责总装——它不足百行，但这几件事都有讲究：
 
 **① 日志**：`logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), ...)`。各模块用 `logging.getLogger("app.cache")` 拿自己的 logger。对比 `print`：日志有级别、时间戳、来源，可统一开关（这就是为什么第 15 章的降级警告不是 print）。
 
@@ -681,7 +711,9 @@ app.include_router(users.router)
 ...
 ```
 
-**复现要点**：把 4 个 router 挂上、CORS 按 DEBUG 切换、logging 配置好。至此你的后端与 `backend/main.py` 等价。
+**④ 定时任务（lifespan）**：RSS 爬虫的调度注册在 `lifespan` 生命周期钩子里——应用启动时先抓一次，之后 `AsyncIOScheduler` 每 6 小时一轮；`CRAWLER_ENABLED=false` 可整体关闭（如开发环境反复热重载时），关闭状态下 shutdown 前要判断 `scheduler.running` 再停，否则抛 `SchedulerNotRunningError`（本项目真实修过的坑）。用 lifespan 而不是模块顶层代码的好处：任务随应用启停，不泄漏后台线程。
+
+**复现要点**：把 6 个 router 挂上（含 ai、crawler）、CORS 按 DEBUG 切换、logging 配置好、lifespan 注册定时抓取。至此你的后端与 `backend/main.py` 等价。
 
 ---
 
@@ -694,7 +726,7 @@ app.include_router(users.router)
 - **AI 问答**：`views/AIChat.vue` 用 fetch 调后端代理 `/api/ai/chat`（SSE 流式），前端零密钥；提供方（智谱/Ollama）与 Key 都在后端 `.env`。
 - **Token 存哪**：登录成功后 token 存进 Pinia 并经 `pinia-plugin-persistedstate` 持久化到 localStorage（键 `user-store`），页面刷新不丢。
 - **联调时的跨域**：开发模式后端 CORS 全放开直接调；若想摆脱 CORS，前端 vite 代理已备好（`vite.config.js` 的 `/api-proxy`）。
-- **联调排错**：前端报"网络请求失败"先看后端终端日志和 `/docs` 能否手工调通——99% 是后端问题或参数名大小写不符（对照 `docs/api-spec.md` 的 alias）。
+- **联调排错**：前端报"网络请求失败"先看后端终端日志和 `/docs` 能否手工调通——99% 是后端问题或参数名大小写不符（对照 `api-spec.md` 的 alias）。
 
 ---
 
@@ -704,11 +736,11 @@ app.include_router(users.router)
 |------|-----------|------|
 | 启动即报 `Can't connect to MySQL` | MySQL 没启动 / `.env` 密码错 / 库没建 | 先 `mysql -uroot -p` 能进；重导 `database/database.sql` |
 | 启动报 `ModuleNotFoundError` | 没进 conda 环境 / 目录不对 | `conda activate ./.conda-env`；必须在 `backend/` 下执行 `uvicorn main:app` |
-| 接口返回 422 | 参数缺失/类型错/`page<1`/密码<6位 | `/docs` 里看该接口的 Schema；422 的 body 会指出哪个参数错 |
+| 接口返回 400 | 参数缺失/类型错/`page<1`/密码<6位 | 响应 `data` 是字段级错误明细数组；`/docs` 里看该接口的 Schema |
 | 401 无效令牌 | 没带 Authorization / token 过期 / Bearer 格式错 | 先登录拿新 token；`/docs` Authorize 重新填 |
-| 404 | id 不存在 / 删除了不属于自己的资源 | 对照 `docs/api-spec.md` |
+| 404 | id 不存在 / 删除了不属于自己的资源 | 对照 `api-spec.md` |
 | 500 数据库操作失败 | 看**后端终端日志**（`LOG_LEVEL=INFO` 以上必打） | 开 `SQL_ECHO=true` 看具体 SQL |
-| 响应字段名和预期对不上 | alias 机制（`publishedTime` vs `publish_time`） | 以 `docs/api-spec.md` 为准 |
+| 响应字段名和预期对不上 | alias 机制（`publishedTime` vs `publish_time`） | 以 `api-spec.md` 为准 |
 | 改了代码不生效 | uvicorn 忘了 `--reload` / 改错环境 | 确认激活的是 `.conda-env` |
 | 请求卡住好几秒 | Redis 挂了但没超时（本项目已配 2s 超时，快速失败降级） | `redis-cli ping` 检查 |
 
@@ -727,35 +759,35 @@ app.include_router(users.router)
 | 响应模型 | 已统一：全部路由挂 `response_model=APIResponse[...]`，`schemas/response.py` 的泛型包络 | —— |
 | 详情/列表时间字段曾两套命名（publishTime 与 publish_time） | 已修复：统一为 `publishTime`（`schemas/base.py` 别名） | —— |
 | 无数据库迁移（表靠 `database.sql`） | 表结构稳定、项目规模小 | 引入 Alembic：模型变更自动生成迁移脚本（前置：统一 metadata，已完成） |
-| 无自动化测试 | —— | pytest + httpx 异步客户端，先覆盖注册/登录/列表/收藏主链路 |
-| 事务"双轨"：crud 内自行 commit + `get_db` 收尾 commit | 简单场景两套都能跑 | 统一为 crud 自管写事务、`get_db` 只管连接生命周期 |
+| 自动化测试 | 已有：后端 pytest 41 例（接口/缓存层/爬虫，aiosqlite+fakeredis 免真实服务）+ 前端 vitest 16 例 | 接入 CI（如 GitHub Actions），每次提交自动跑 |
 
 ---
 
 ## 附录 A：复现检查清单
 
-- [ ] conda 环境建立，9 个依赖能 import
+- [ ] conda 环境建立，13 个依赖能 import
 - [ ] `uvicorn main:app` 启动，`/` 与 `/docs` 可访问
 - [ ] `config/`：连接串从 `.env` 拼出；Redis 客户端带超时
-- [ ] `models/`：5 个模型 + 统一 Base + TimestampMixin；`datetime.now` 不带括号
-- [ ] `schemas/`：各模块 Request/Response，alias 与 `docs/api-spec.md` 一致
+- [ ] `models/`：8 个模型 + 统一 Base + TimestampMixin；`datetime.now` 不带括号
+- [ ] `schemas/`：各模块 Request/Response，alias 与 `api-spec.md` 一致
 - [ ] `utils/`：bcrypt 哈希自测通过；`schemas/response.py` 的 `APIResponse` 泛型包络
 - [ ] `crud/users.py`：注册后 user 表有 bcrypt 密码行
 - [ ] `routers/users.py`：/docs 全链路（注册→登录→信息→改密）
 - [ ] `utils/auth.py`：错误 token 401，正确 token 200
-- [ ] `news_cache.py` + `routers/news.py`：分页 hasMore 正确，`page=0` 是 422
+- [ ] `news_cache.py` + `routers/news.py`：分页 hasMore 正确，`page=0` 是 400
 - [ ] 缓存：二次请求不产生 SQL 日志；Redis 停掉后功能仍可用（降级）
 - [ ] 浏览量自增后，详情缓存被失效（再次请求看到新浏览量）
 - [ ] 重复注册/重复收藏返回 400 且文案与约束对应
 - [ ] 收藏/历史 join 列表含时间与 id；历史删除仅限本人记录
 - [ ] `main.py`：CORS 随 DEBUG_MODE 切换；日志替代 print
+- [ ] `python -m pytest` 全部通过（aiosqlite + fakeredis，无需真实 MySQL/Redis）
 
 ## 附录 B：术语表
 
 | 术语 | 一句话解释 |
 |------|-----------|
 | HTTP 方法 | GET 读 / POST 建 / PUT 改 / DELETE 删，接口的"动词" |
-| 状态码 | 200 成功、400 参数/业务错、401 未认证、404 不存在、422 校验失败、500 服务器内部错 |
+| 状态码 | 200 成功、400 参数/业务/校验错（本项目校验失败也归 400）、401 未认证、404 不存在、429 请求过于频繁、500 服务器内部错 |
 | 端点（endpoint） | 一个"方法 + 路径"组合，如 `GET /api/news/list` |
 | 依赖注入 | 框架自动准备参数（db 会话、当前用户），函数只声明"我需要什么" |
 | ORM | 用类/对象操作数据库，SQL 由框架生成并参数化 |
