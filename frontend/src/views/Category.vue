@@ -30,6 +30,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import TabBar from '../components/TabBar.vue'
 import { computed } from 'vue'
+import { CATEGORY_NAME_KEY_MAP } from '../constants/categories'
 
 const newsStore = useNewsStore()
 const router = useRouter()
@@ -57,22 +58,9 @@ const goToCategoryNews = (categoryId) => {
   })
 }
 
-// 获取分类名称的翻译
+// 获取分类名称的翻译（映射统一在 constants/categories.js 维护）
 const getCategoryTranslation = (categoryName) => {
-  const categoryMap = {
-    '头条': 'headline',
-    '社会': 'society',
-    '国内': 'domestic',
-    '国际': 'international',
-    '娱乐': 'entertainment',
-    '体育': 'sports',
-    '军事': 'military',
-    '科技': 'technology',
-    '财经': 'finance',
-    '更多': 'more'
-  };
-  
-  const key = categoryMap[categoryName];
+  const key = CATEGORY_NAME_KEY_MAP[categoryName];
   return key ? t(`home.categories.${key}`) : categoryName;
 }
 </script>
