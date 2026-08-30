@@ -2,6 +2,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select, func, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config.db_conf import AsyncSessionLocal
 from cache.news_cache import (
     EMPTY,
     get_cached_categories,
@@ -15,6 +16,7 @@ from cache.news_cache import (
     get_cached_news_count,
     set_cache_news_count,
     invalidate_news_caches,
+    invalidate_category_caches,
 )
 from models.news import Category, News
 from schemas.base import NewsItemBase
@@ -75,7 +77,12 @@ async def get_news_count_cached(db: AsyncSession, category_id: int):
     # 查询的是指定分类下的新闻数量
     stmt = select(func.count(News.id)).where(News.category_id == category_id)
     result = await db.execute(stmt)
-    return result.scalar_one()  # 只能有一个结果，否则报错
+    count = result.scalar_one()  # 只能有一个结果，否则报错
+
+    # 回写缓存：0 也是合法缓存值（读取侧以 None 区分未命中），不写的话缓存永远冰冷
+    await set_cache_news_count(category_id, count)
+
+    return count
 
 
 async def get_news_detail(db: AsyncSession, news_id: int):
@@ -113,6 +120,16 @@ async def increase_news_views(db: AsyncSession, news_id: int):
 
     # 更新 → 检查数据库是否真的命中了数据 → 命中了返回True
     return result.rowcount > 0
+
+
+async def increase_news_views_in_background(news_id: int) -> None:
+    """后台任务入口：自建独立会话执行浏览量自增。
+    BackgroundTasks 在响应发出后才运行，此时请求级会话已关闭，必须新建会话"""
+    async with AsyncSessionLocal() as db:
+        try:
+            await increase_news_views(db, news_id)
+        except Exception:
+            await db.rollback()
 
 
 async def get_related_news(db: AsyncSession, news_id: int, category_id: int, limit: int = 5):

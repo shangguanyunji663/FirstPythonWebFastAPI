@@ -106,3 +106,9 @@ async def invalidate_news_caches(news_id: int) -> None:
     列表缓存保留 TTL 内的旧浏览量（列表允许短暂滞后，避免每次浏览都清空全部列表缓存）"""
     await delete_cache(f"{NEWS_DETAIL_PREFIX}{news_id}")
     await delete_cache_pattern(f"{RELATED_NEWS_PREFIX}{news_id}:*")
+
+
+async def invalidate_category_caches(category_id: int) -> None:
+    """新闻增删后失效该分类的列表与总数缓存（浏览量变更走 invalidate_news_caches）"""
+    await delete_cache(f"{NEWS_COUNT_PREFIX}{category_id}")
+    await delete_cache_pattern(f"{NEWS_LIST_PREFIX}{category_id}:*")

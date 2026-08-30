@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.db_conf import get_db
@@ -49,15 +49,17 @@ async def get_news_list(
 
 
 @router.get("/detail", response_model=APIResponse[NewsDetailResponse])
-async def get_news_detail(news_id: int = Query(..., alias="id"), db: AsyncSession = Depends(get_db)):
-    # 获取新闻详情 + 浏览量+1 + 相关新闻
+async def get_news_detail(background_tasks: BackgroundTasks,
+                          news_id: int = Query(..., alias="id"),
+                          db: AsyncSession = Depends(get_db)):
+    # 获取新闻详情 + 浏览量+1（后台异步） + 相关新闻
     news_detail = await news_cache.get_news_detail(db, news_id)
     if not news_detail:
         raise HTTPException(status_code=404, detail="新闻不存在")
 
-    views_res = await news_cache.increase_news_views(db, news_detail.id)
-    if not views_res:
-        raise HTTPException(status_code=404, detail="新闻不存在")
+    # 浏览量自增延后到响应之后执行：GET 请求不再阻塞在写库上，
+    # 响应中的 views 保持旧行为（取缓存/自增前的值）
+    background_tasks.add_task(news_cache.increase_news_views_in_background, news_detail.id)
 
     related_news = await news_cache.get_related_news(db, news_detail.id, news_detail.category_id)
 
