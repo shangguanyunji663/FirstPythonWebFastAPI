@@ -4,7 +4,8 @@ from starlette import status
 
 from models.users import User
 from schemas.response import APIResponse
-from schemas.users import UserRequest, UserAuthResponse, UserInfoResponse, UserUpdateRequest, UserChangePasswordRequest
+from schemas.users import UserRequest, UserLoginRequest, UserAuthResponse, UserInfoResponse, UserUpdateRequest, \
+    UserChangePasswordRequest
 
 from config.db_conf import get_db
 from crud import users
@@ -30,7 +31,7 @@ async def register(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=APIResponse[UserAuthResponse])
-async def login(user_data: UserRequest, db: AsyncSession = Depends(get_db)):
+async def login(user_data: UserLoginRequest, db: AsyncSession = Depends(get_db)):
     # 登录逻辑：限流检查 -> 验证用户是否存在 -> 验证密码 -> 生成 Token  → 响应结果
     check_login_rate_limit(user_data.username)
     user = await users.authenticate_user(db, user_data.username, user_data.password)

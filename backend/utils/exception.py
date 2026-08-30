@@ -2,6 +2,7 @@ import os
 import traceback
 
 from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from starlette import status
@@ -19,6 +20,38 @@ CONSTRAINT_MESSAGES = {
     "user_news_unique": "已收藏过该新闻",
     "news_related_unique": "关联新闻记录重复",
 }
+
+
+# Pydantic v2 错误 type -> 用户提示（未收录的类型回退到原始 msg）
+VALIDATION_MESSAGE_MAP = {
+    "missing": "该字段为必填项",
+    "string_too_short": "长度不足",
+    "string_too_long": "长度超出限制",
+    "string_pattern_mismatch": "格式不正确",
+    "literal_error": "取值不合法",
+    "greater_than_equal": "不能小于最小值",
+    "less_than_equal": "不能大于最大值",
+}
+
+
+async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+    """
+    处理请求参数校验错误：不落进兜底 500，而是按业务格式返回 400 + 字段级错误明细
+    """
+    errors = []
+    for err in exc.errors():
+        field = ".".join(str(loc) for loc in err.get("loc", ()) if loc != "body")
+        message = VALIDATION_MESSAGE_MAP.get(err.get("type"), err.get("msg", "参数不合法"))
+        errors.append({"field": field, "message": message})
+
+    return JSONResponse(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        content={
+            "code": 400,
+            "message": errors[0]["message"] if errors else "请求参数不合法",
+            "data": errors,
+        }
+    )
 
 
 async def http_exception_handler(request: Request, exc: HTTPException):
